@@ -1585,14 +1585,15 @@ function actualizarTotalesFaseCard(card) {
     const soya = parseFloat(card.querySelector('.fase-soya')?.value) || 0;
     const coco = parseFloat(card.querySelector('.fase-coco')?.value) || 0;
     const pct = parseFloat(card.querySelector('.fase-pct-esencia')?.value) || 0;
-    const totalCera = soya + coco;
-    const esenciaGramos = totalCera * (pct / 100);
+    const totalFase = soya + coco;
+    const esenciaGramos = totalFase * (pct / 100);
+    const ceraPura = totalFase - esenciaGramos;
 
     const subCera = card.querySelector('.subtotal-cera-badge');
-    if (subCera) subCera.innerText = `Total cera: ${totalCera.toFixed(1)}g`;
+    if (subCera) subCera.innerText = `Cera pura: ${ceraPura.toFixed(1)}g`;
 
     const subEsencia = card.querySelector('.subtotal-esencia-badge');
-    if (subEsencia) subEsencia.innerText = `${esenciaGramos.toFixed(1)}g esencia`;
+    if (subEsencia) subEsencia.innerText = `Esencia: ${esenciaGramos.toFixed(1)}g | Cera + Esencia: ${totalFase.toFixed(1)}g`;
 }
 
 function agregarFilaFaseProducto(faseData = null) {
@@ -3256,8 +3257,9 @@ function calcularFórmulaLote() {
 
         keysJarras.forEach(key => {
             const jData = jarrasFusionadasLote[key];
-            const totalJarra = jData.soya + jData.coco;
-            const esenciaRequerida10Porciento = totalJarra * 0.10;
+            const totalCeraJarra = jData.soya + jData.coco;
+            const cantEsencia = (jData.esenciaGramos > 0) ? jData.esenciaGramos : (totalCeraJarra * 0.10);
+            const totalCeraConEsencia = totalCeraJarra + cantEsencia;
 
             let badgeColor = 'bg-slate-100 text-slate-800 border-slate-300';
             if (jData.color === 'Café') badgeColor = 'bg-amber-100 text-amber-900 border-amber-300';
@@ -3280,8 +3282,9 @@ function calcularFórmulaLote() {
                             <span class="text-xs px-3 py-1 rounded-full font-black bg-rose-100 text-rose-900 border border-rose-200">📌 ${jData.tipoFase}</span>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-xs sm:text-sm font-black text-rose-900 bg-rose-100 px-3.5 py-1.5 rounded-xl border border-rose-200">Total Cera: ${totalJarra.toFixed(1)} g</span>
-                            <span class="text-xs sm:text-sm font-black text-amber-900 bg-amber-100 px-3.5 py-1.5 rounded-xl border border-amber-300" title="Esencia calculada al 10%">💧 Esencia (10%): ${esenciaRequerida10Porciento.toFixed(1)} g</span>
+                            <span class="text-xs sm:text-sm font-black text-emerald-900 bg-emerald-100 px-3.5 py-1.5 rounded-xl border border-emerald-200">Cera Pura: ${totalCeraJarra.toFixed(1)} g</span>
+                            <span class="text-xs sm:text-sm font-black text-amber-900 bg-amber-100 px-3.5 py-1.5 rounded-xl border border-amber-300">💧 Esencia: ${cantEsencia.toFixed(1)} g</span>
+                            <span class="text-xs sm:text-sm font-black text-purple-900 bg-purple-100 px-3.5 py-1.5 rounded-xl border border-purple-300">🎯 Cera + Esencia: ${totalCeraConEsencia.toFixed(1)} g</span>
                         </div>
                     </div>
 
@@ -3291,26 +3294,50 @@ function calcularFórmulaLote() {
                         <span class="text-base sm:text-lg font-black text-rose-950 leading-relaxed">${jData.origenProductos.join(' &nbsp;•&nbsp; ')}</span>
                     </div>
 
-                    <!-- CERA DE SOYA / COCO A PESAR (MUY CLARO Y GRANDE) -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    <!-- PASOS DE PESAJE: CERAS Y ESENCIA -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
                         ${jData.soya > 0 ? `
-                            <div class="bg-emerald-50 border-2 border-emerald-300 p-5 rounded-2xl flex items-center justify-between shadow-2xs">
+                            <div class="bg-emerald-50 border-2 border-emerald-300 p-4 rounded-2xl flex items-center justify-between shadow-2xs">
                                 <div>
-                                    <span class="block text-xs sm:text-sm font-extrabold text-emerald-800 uppercase tracking-wider mb-1">🌱 Cera de Soya a pesar:</span>
-                                    <span class="text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight">${jData.soya.toFixed(1)} <span class="text-sm sm:text-base font-bold text-emerald-700">gramos</span></span>
+                                    <span class="block text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider mb-0.5">🌱 1. Cera de Soya a pesar:</span>
+                                    <span class="text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight">${jData.soya.toFixed(1)} <span class="text-xs sm:text-sm font-bold text-emerald-700">g</span></span>
                                 </div>
-                                <span class="text-3xl">⚖️</span>
+                                <span class="text-2xl">🌱</span>
                             </div>
                         ` : ''}
                         ${jData.coco > 0 ? `
-                            <div class="bg-amber-50 border-2 border-amber-300 p-5 rounded-2xl flex items-center justify-between shadow-2xs">
+                            <div class="bg-amber-50 border-2 border-amber-300 p-4 rounded-2xl flex items-center justify-between shadow-2xs">
                                 <div>
-                                    <span class="block text-xs sm:text-sm font-extrabold text-amber-800 uppercase tracking-wider mb-1">🥥 Cera de Coco a pesar:</span>
-                                    <span class="text-2xl sm:text-3xl font-black text-amber-950 tracking-tight">${jData.coco.toFixed(1)} <span class="text-sm sm:text-base font-bold text-amber-700">gramos</span></span>
+                                    <span class="block text-[11px] font-extrabold text-amber-800 uppercase tracking-wider mb-0.5">🥥 1. Cera de Coco a pesar:</span>
+                                    <span class="text-2xl sm:text-3xl font-black text-amber-950 tracking-tight">${jData.coco.toFixed(1)} <span class="text-xs sm:text-sm font-bold text-amber-700">g</span></span>
                                 </div>
-                                <span class="text-3xl">⚖️</span>
+                                <span class="text-2xl">🥥</span>
                             </div>
                         ` : ''}
+                        <div class="bg-sky-50 border-2 border-sky-300 p-4 rounded-2xl flex items-center justify-between shadow-2xs">
+                            <div>
+                                <span class="block text-[11px] font-extrabold text-sky-800 uppercase tracking-wider mb-0.5">💧 2. Cantidad de Esencia:</span>
+                                <span class="text-2xl sm:text-3xl font-black text-sky-950 tracking-tight">${cantEsencia.toFixed(1)} <span class="text-xs sm:text-sm font-bold text-sky-700">g</span></span>
+                            </div>
+                            <span class="text-2xl">💧</span>
+                        </div>
+                    </div>
+
+                    <!-- META EN BÁSCULA: CERA + ESENCIA (HASTA DÓNDE PONER DE AROMA) -->
+                    <div class="bg-purple-50/90 border-2 border-purple-300 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xl">🎯</span>
+                                <span class="text-xs sm:text-sm font-black text-purple-950 uppercase tracking-wider">Cera con Esencia (Marca Final en Báscula):</span>
+                            </div>
+                            <p class="text-xs sm:text-sm text-purple-900 font-bold">
+                                👉 Pon tu cera (${totalCeraJarra.toFixed(1)} g) y luego <span class="text-purple-700 font-black underline">vierte aroma hasta que la báscula marque exactamente:</span>
+                            </p>
+                        </div>
+                        <div class="bg-white border-2 border-purple-400 px-5 py-2.5 rounded-2xl shadow-inner text-center self-stretch sm:self-auto min-w-[170px]">
+                            <span class="text-2xl sm:text-3xl font-black text-purple-950 tracking-tight">${totalCeraConEsencia.toFixed(1)}</span>
+                            <span class="text-xs sm:text-sm font-black text-purple-700 ml-1">gramos</span>
+                        </div>
                     </div>
                 </div>
             `;
