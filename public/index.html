@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🕯️ Sistema de Inventario & Guía de Taller - Velas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pastel: {
+                            50: '#FFF5F7',
+                            100: '#FFE4E8',
+                            200: '#FECDD6',
+                            300: '#FDA4AF',
+                            400: '#FB7185',
+                            500: '#F43F5E',
+                            600: '#E11D48',
+                            700: '#BE123C',
+                            800: '#9F1239',
+                            900: '#881337',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar cute pastel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FFF5F7;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #FDA4AF;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FB7185;
+        }
+
+        /* Estilos para el selector buscable custom */
+        .combobox-container {
+            position: relative;
+            width: 100%;
+        }
+        .combobox-dropdown {
+            max-height: 280px;
+            box-shadow: 0 10px 25px -5px rgba(244, 63, 94, 0.15), 0 8px 10px -6px rgba(244, 63, 94, 0.1);
+        }
+        .combobox-option:hover {
+            background-color: #FFE4E8;
+            color: #9F1239;
+        }
+        .combobox-option.is-selected {
+            background-color: #F43F5E;
+            color: #FFFFFF;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="bg-[#FFF5F7] font-sans text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- HEADER / ENCABEZADO CUTE PASTEL -->
+    <!-- HEADER / ENCABEZADO CUTE PASTEL (COLOR FIJO ROSA) -->
+    <header class="bg-rose-400 text-white shadow-sm sticky top-0 z-40">
+        <div class="w-full max-w-[1750px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl filter drop-shadow-xs">🕯️✨</span>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black tracking-wide leading-tight">
+                        Taller de Fabricación & Aromas (Velas, Sprays & Más)
+                    </h1>
+                    <p class="text-xs text-rose-100 font-medium hidden sm:block">Control de Stock, Fórmulas Multicapa, Producción & Plan del Día</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="abrirSelectorPerfil()" id="btn-perfil-activo" class="text-xs bg-white text-rose-950 px-3.5 py-1.5 rounded-full font-bold border border-white/40 flex items-center gap-1.5 shadow-xs hover:bg-rose-50 transition active:scale-95" title="Cambiar persona activa">
+                    <span>👤</span>
+                    <span id="texto-perfil-activo">Elegir Perfil</span>
+                </button>
+                <button type="button" onclick="abrirModalCambiarPin()" class="text-xs bg-white/20 hover:bg-white/30 text-white px-2.5 py-1.5 rounded-full font-bold border border-white/30 transition shadow-xs active:scale-95 flex items-center gap-1" title="Cambiar PIN del taller">
+                    <span>🔑</span>
+                    <span class="hidden md:inline text-[11px]">Cambiar PIN</span>
+                </button>
+                <button type="button" onclick="cerrarSesionPin()" class="text-xs bg-white/20 hover:bg-white/30 text-white px-2.5 py-1.5 rounded-full font-bold border border-white/30 transition shadow-xs active:scale-95" title="Bloquear con PIN">
+                    🔒
+                </button>
+                <span class="text-xs bg-white/20 backdrop-blur-md px-3.5 py-1.5 rounded-full font-bold text-white border border-white/30 hidden sm:flex items-center gap-1.5 shadow-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                    <span>Taller Activo</span>
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- NAVEGACIÓN PRINCIPAL (PESTAÑAS) FULL WIDTH -->
+    <div class="bg-white border-b-2 border-rose-200 shadow-2xs sticky top-[65px] z-30">
+        <div class="w-full max-w-[1750px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex gap-2 py-2.5 overflow-x-auto no-scrollbar">
+                <button id="tab-taller-btn" onclick="cambiarPestana('taller')" class="py-2.5 px-5 rounded-2xl font-black text-sm transition-all whitespace-nowrap flex items-center gap-2 bg-rose-500 text-white shadow-sm shadow-rose-200">
+                    <span>📦</span>
+                    <span>1. Inventario Taller (Insumos)</span>
+                </button>
+                <button id="tab-terminado-btn" onclick="cambiarPestana('terminado')" class="py-2.5 px-5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap flex items-center gap-2 text-rose-950/70 hover:text-rose-600 hover:bg-rose-50">
+                    <span>✨</span>
+                    <span>2. Producto Terminado y Fórmulas</span>
+                </button>
+                <button id="tab-produccion-btn" onclick="cambiarPestana('produccion')" class="py-2.5 px-5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap flex items-center gap-2 text-rose-950/70 hover:text-rose-600 hover:bg-rose-50">
+                    <span>⚡</span>
+                    <span>3. Registrar Producción Masiva</span>
+                </button>
+                <button id="tab-fichas-btn" onclick="cambiarPestana('fichas')" class="py-2.5 px-5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap flex items-center gap-2 text-rose-950/70 hover:text-rose-600 hover:bg-rose-50">
+                    <span>📘</span>
+                    <span>4. Fichas Técnicas & Calculadora de Mezcla</span>
+                </button>
+                <button id="tab-plan-btn" onclick="cambiarPestana('plan')" class="py-2.5 px-5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap flex items-center gap-2 text-rose-950/70 hover:text-rose-600 hover:bg-rose-50">
+                    <span>📋</span>
+                    <span>5. Plan del Día (Checklist)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL FLUIDO (USA TODA LA PANTALLA) -->
+    <main class="w-full max-w-[1750px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 space-y-8">
+
+        <!-- ========================================== -->
+        <!-- SECCIÓN 1: INVENTARIO TALLER (INSUMOS) -->
+        <!-- ========================================== -->
+        <section id="pestana-taller" class="space-y-6">
+            <!-- TARJETA TABLA STOCK INSUMOS -->
+            <div class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 space-y-4">
+                <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-4 border-b border-rose-100 pb-4">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-black text-rose-950 flex items-center gap-2">
+                            <span>📦</span> Materia Prima & Insumos en Taller
+                        </h2>
+                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Existencias actuales para ceras, esencias, envases, pabilos y adornos.</p>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div class="relative min-w-[240px]">
+                            <input type="text" id="buscador-global-insumos" oninput="cargarInsumos()" placeholder="🔍 Buscar insumo (ej. soya, sándalo)..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:border-rose-400 focus:outline-none bg-rose-50/30">
+                        </div>
+                        <div class="flex items-center gap-2 min-w-[220px]">
+                            <label for="filtro-cat-insumo" class="text-xs font-bold text-rose-900 whitespace-nowrap">Categoría:</label>
+                            <select id="filtro-cat-insumo" onchange="cargarInsumos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                                <option value="">Todas las categorías</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 min-w-[200px]">
+                            <label for="filtro-temporada-insumo" class="text-xs font-bold text-rose-900 whitespace-nowrap">Colección:</label>
+                            <select id="filtro-temporada-insumo" onchange="cargarInsumos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                                <option value="todos" selected>👁️ Todos los insumos</option>
+                                <option value="linea">✨ Solo de Línea</option>
+                                <option value="temporada">🍁 Solo de Temporada</option>
+                                <option value="pausados">❄️ Pausados (Fuera de Temp.)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
+                                <th class="p-4">Insumo</th>
+                                <th class="p-4">Categoría / Carpeta</th>
+                                <th class="p-4">Tipo</th>
+                                <th class="p-4">Stock en Taller</th>
+                                <th class="p-4">Unidad</th>
+                                <th class="p-4 text-center">Colección / Tipo</th>
+                                <th class="p-4 text-center">Ajuste de Stock</th>
+                                <th class="p-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-insumos" class="divide-y divide-rose-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- HISTORIAL PESTAÑA 1 -->
+            <div class="bg-white p-5 sm:p-7 rounded-3xl shadow-sm border-2 border-rose-100 space-y-4">
+                <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-black text-rose-950 flex items-center gap-2">
+                            <span>📜</span> Historial Reciente de Movimientos en Taller
+                        </h3>
+                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Registro de entradas manuales y consumos de producción. Cada registro permanece guardado permanentemente a menos que decidas eliminarlo manualmente.</p>
+                    </div>
+                    <button onclick="cargarHistorialInsumos()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl border border-rose-200 transition">
+                        🔄 Refrescar Historial
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
+                                <th class="p-3.5">Fecha</th>
+                                <th class="p-3.5">Insumo</th>
+                                <th class="p-3.5">Tipo Movimiento</th>
+                                <th class="p-3.5">Cantidad</th>
+                                <th class="p-3.5">Origen / Detalle</th>
+                                <th class="p-3.5 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial-insumos" class="divide-y divide-rose-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- GESTIÓN DE CATEGORÍAS & AGREGAR INSUMO -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Árbol y Gestor de Categorías de Insumos -->
+                <div class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 lg:col-span-6 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-rose-100 pb-3">
+                        <div>
+                            <h2 class="text-lg font-black text-rose-950 flex items-center gap-2">
+                                <span>📁</span> Categorías de Insumos (<span id="count-cat-insumo">0</span>)
+                            </h2>
+                            <p class="text-xs text-slate-500 font-medium">Organiza tus ceras, esencias, envases y pabilos en carpetas.</p>
+                        </div>
+                        <button type="button" onclick="abrirModalCrearCategoria('insumo')" class="bg-rose-500 hover:bg-rose-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5 whitespace-nowrap active:scale-95">
+                            <span>+</span> Nueva Categoría
+                        </button>
+                    </div>
+
+                    <div class="relative">
+                        <input type="text" id="buscar-cat-insumo" oninput="renderizarArbolCategorias('insumo')" placeholder="🔍 Filtrar o buscar categoría..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/30">
+                    </div>
+
+                    <div id="arbol-cat-insumo" class="space-y-2.5 max-h-[380px] overflow-y-auto pr-1"></div>
+                </div>
+
+                <!-- Formulario Agregar / Editar Insumo -->
+                <div id="seccion-form-insumo" class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 lg:col-span-6 space-y-4">
+                    <div class="border-b border-rose-100 pb-3 flex justify-between items-center">
+                        <div>
+                            <h2 id="titulo-form-insumo" class="text-lg font-black text-rose-950">Agregar Insumo a Taller</h2>
+                            <p class="text-xs text-slate-500 font-medium">Ingresa el nombre, carpeta y stock disponible.</p>
+                        </div>
+                        <button type="button" onclick="limpiarFormularioInsumo()" class="text-xs text-rose-600 font-bold hover:underline">
+                            Limpiar
+                        </button>
+                    </div>
+                    
+                    <input type="hidden" id="edit-insumo-id">
+                    
+                    <div class="grid grid-cols-2 gap-3.5">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Nombre del Insumo:</label>
+                            <input type="text" id="insumo-nombre" placeholder="Ej. Esencia de Sándalo Dulce / Cera de Soya Bajo Punto" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                        </div>
+                        
+                        <div class="col-span-2 sm:col-span-1">
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-bold text-rose-900 uppercase tracking-wider">Carpeta / Categoría:</label>
+                                <button type="button" onclick="abrirModalCrearCategoria('insumo')" class="text-[11px] text-rose-600 font-bold hover:underline">+ Nueva</button>
+                            </div>
+                            <select id="insumo-categoria" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                                <option value="">Selecciona categoría...</option>
+                            </select>
+                        </div>
+
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="text-xs font-bold text-rose-900 uppercase tracking-wider block mb-1">Unidad de Medida:</label>
+                            <select id="insumo-unidad" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                                <option value="kg">Kilogramos (kg)</option>
+                                <option value="gramos">Gramos (g)</option>
+                                <option value="litros">Litros (L)</option>
+                                <option value="ml">Mililitros (ml)</option>
+                                <option value="piezas">Piezas / Unidades</option>
+                            </select>
+                        </div>
+
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Stock Inicial Disponible:</label>
+                            <input type="number" id="insumo-stock" placeholder="0" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-bold text-rose-900 focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20" step="0.001" min="0">
+                        </div>
+                        
+                        <div class="col-span-2 bg-rose-50/50 p-3 rounded-xl border border-rose-200">
+                            <label class="flex items-center gap-2.5 text-xs font-bold text-rose-900 cursor-pointer">
+                                <input type="checkbox" id="insumo-es-generico" class="w-4 h-4 text-rose-600 rounded cursor-pointer">
+                                <span>Marcar como "Insumo Genérico" (Plantilla de aroma para fórmulas base de categoría)</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Colección de Temporada para Insumo -->
+                        <div class="col-span-2 bg-rose-50/50 p-4 rounded-2xl border-2 border-rose-200 space-y-2">
+                            <label class="flex items-center gap-2.5 text-xs font-bold text-rose-950 cursor-pointer select-none">
+                                <input type="checkbox" id="check-insumo-temporada" onchange="toggleOpcionesTemporadaInsumoForm()" class="w-4 h-4 text-rose-500 rounded focus:ring-rose-400">
+                                <span>¿Es insumo de temporada? (Esencia, molde o adorno especial que se pausa parte del año)</span>
+                            </label>
+                            <div id="panel-insumo-temporada-opciones" class="hidden pt-2 border-t border-rose-200/80 flex items-center justify-between gap-3">
+                                <span class="text-xs text-rose-900 font-bold">Estado de la temporada:</span>
+                                <select id="insumo-temporada-estado" class="border-2 border-rose-200 p-2 rounded-xl text-xs font-bold bg-white text-rose-950 focus:outline-none">
+                                    <option value="1">☀️ Activo (En temporada actual)</option>
+                                    <option value="0">❄️ Pausado (Fuera de temporada)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button id="btn-guardar-insumo" onclick="guardarInsumo()" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-3.5 rounded-xl text-sm font-bold col-span-2 shadow-md shadow-rose-200 transition active:scale-[0.98]">
+                            💾 Guardar Insumo en Taller
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECCIÓN 2: PRODUCTO TERMINADO Y FÓRMULAS -->
+        <!-- ========================================== -->
+        <section id="pestana-terminado" class="space-y-6 hidden">
+            <!-- TABLA PRODUCTOS TERMINADOS -->
+            <div class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 space-y-4">
+                <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-4 border-b border-rose-100 pb-4">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-black text-rose-950 flex items-center gap-2">
+                            <span>📦</span> Stock de Productos Terminados
+                        </h2>
+                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Catálogo completo de velas, sprays, aromatizantes y productos terminados listos para entrega.</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div class="relative min-w-[220px]">
+                            <input type="text" id="buscador-global-productos" oninput="cargarProductos()" placeholder="🔍 Buscar producto..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/30">
+                        </div>
+                        <div class="flex items-center gap-2 min-w-[200px]">
+                            <label for="filtro-cat-prod" class="text-xs font-bold text-rose-900 whitespace-nowrap">Categoría:</label>
+                            <select id="filtro-cat-prod" onchange="cargarProductos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                                <option value="">Todas las categorías</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 min-w-[200px]">
+                            <label for="filtro-temporada-prod" class="text-xs font-bold text-rose-900 whitespace-nowrap">Colección:</label>
+                            <select id="filtro-temporada-prod" onchange="cargarProductos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                                <option value="todos" selected>👁️ Todos los productos</option>
+                                <option value="linea">✨ Solo de Línea</option>
+                                <option value="temporada">🍁 Solo de Temporada</option>
+                                <option value="pausados">❄️ Pausados (Fuera de Temp.)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
+                                <th class="p-4">Producto</th>
+                                <th class="p-4">Categoría / Carpeta</th>
+                                <th class="p-4">Tipo / Estructura</th>
+                                <th class="p-4">Stock</th>
+                                <th class="p-4 text-center">Colección / Tipo</th>
+                                <th class="p-4 text-center">Ajuste de Stock</th>
+                                <th class="p-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-productos" class="divide-y divide-rose-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- HISTORIAL PESTAÑA 2 -->
+            <div class="bg-white p-5 sm:p-7 rounded-3xl shadow-sm border-2 border-rose-100 space-y-4">
+                <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-black text-rose-950 flex items-center gap-2">
+                            <span>📜</span> Historial Reciente de Entradas en Producto Terminado
+                        </h3>
+                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Registro de entradas manuales vs jornadas de fabricación con responsable. Cada registro permanece guardado permanentemente a menos que decidas eliminarlo manualmente.</p>
+                    </div>
+                    <button onclick="cargarHistorialProductos()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl border border-rose-200 transition">
+                        🔄 Refrescar Historial
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
+                                <th class="p-3.5">Fecha</th>
+                                <th class="p-3.5">Producto Fabricado</th>
+                                <th class="p-3.5">Tipo</th>
+                                <th class="p-3.5">Cantidad</th>
+                                <th class="p-3.5">Origen & Responsable</th>
+                                <th class="p-3.5 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial-productos" class="divide-y divide-rose-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CATEGORÍAS & EDITOR DE PRODUCTOS -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Árbol y Gestor de Categorías de Productos -->
+                <div class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 lg:col-span-5 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-rose-100 pb-3">
+                        <div>
+                            <h2 class="text-lg font-black text-rose-950 flex items-center gap-2">
+                                <span>📁</span> Familias de Productos (<span id="count-cat-prod">0</span>)
+                            </h2>
+                            <p class="text-xs text-slate-500 font-medium">Velas de Postre, Sprays textiles, Aromatizantes, Wax Melts...</p>
+                        </div>
+                        <button type="button" onclick="abrirModalCrearCategoria('prod')" class="bg-rose-500 hover:bg-rose-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5 whitespace-nowrap active:scale-95">
+                            <span>+</span> Nueva Familia
+                        </button>
+                    </div>
+
+                    <div class="relative">
+                        <input type="text" id="buscar-cat-prod" oninput="renderizarArbolCategorias('prod')" placeholder="🔍 Filtrar o buscar categoría..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/30">
+                    </div>
+
+                    <div id="arbol-cat-prod" class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1"></div>
+                </div>
+
+                <!-- Formulario Crear / Editar / Duplicar Producto -->
+                <div id="seccion-form-producto" class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 lg:col-span-7 space-y-4">
+                    <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                        <div>
+                            <h2 id="titulo-form-producto" class="text-lg sm:text-xl font-black text-rose-950">Agregar Nuevo Producto</h2>
+                            <p id="subtitulo-form-producto" class="text-xs sm:text-sm text-slate-500 font-medium">Configura un producto estándar (spray, aromatizante, vela simple) o multicapa/postre.</p>
+                        </div>
+                        <button type="button" onclick="limpiarFormularioProducto()" class="text-xs text-rose-600 font-bold hover:underline">
+                            Limpiar / Nuevo
+                        </button>
+                    </div>
+
+                    <input type="hidden" id="edit-prod-id">
+
+                    <!-- Nombre del producto -->
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Nombre del Producto:</label>
+                        <input type="text" id="prod-nombre" placeholder="Ej. Vela Postre Fresa / Spray Textil Vainilla / Aromatizante Lavanda" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                    </div>
+
+                    <!-- Categoría del producto -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-bold text-rose-900 uppercase tracking-wider">Carpeta / Categoría:</label>
+                            <button type="button" onclick="abrirModalCrearCategoria('prod')" class="text-[11px] text-rose-600 font-bold hover:underline">+ Crear nueva</button>
+                        </div>
+                        <select id="prod-categoria" onchange="actualizarMapeoGenericosProducto()" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                            <option value="">Selecciona categoría...</option>
+                        </select>
+                    </div>
+
+                    <!-- Selector Visual de Tipo de Producto -->
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-2">Estructura del Producto:</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" id="btn-tipo-prod-estandar" onclick="seleccionarTipoEstructuraProducto('estandar')" class="p-3.5 rounded-2xl border-2 border-rose-500 bg-rose-50/70 text-rose-950 font-bold text-xs sm:text-sm flex flex-col items-center gap-1 transition shadow-xs">
+                                <span class="text-xl">🧴</span>
+                                <span>Estándar / 1 Vertido</span>
+                                <span class="text-[11px] font-normal text-rose-700">Spray / Difusor / Vela clásica</span>
+                            </button>
+                            <button type="button" id="btn-tipo-prod-postre" onclick="seleccionarTipoEstructuraProducto('postre')" class="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-600 font-bold text-xs sm:text-sm flex flex-col items-center gap-1 transition">
+                                <span class="text-xl">🧁</span>
+                                <span>Multicapa / Postre</span>
+                                <span class="text-[11px] font-normal text-slate-400">Base + Betún + Toppings</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- MODO POSTRE / MULTICAPA -->
+                    <div id="panel-modo-postre" class="space-y-4 hidden">
+                        <!-- Fases de Cera -->
+                        <div class="bg-gradient-to-br from-rose-50/50 to-pink-50/40 p-4 sm:p-5 rounded-2xl border border-rose-200 space-y-3">
+                            <div>
+                                <h4 class="font-extrabold text-sm text-rose-950 uppercase tracking-wider flex items-center gap-2">
+                                    <span>🥣</span> Fases y Capas de Cera (Colores y Gramajes)
+                                </h4>
+                                <p class="text-xs text-slate-500 font-medium">La calculadora unirá automáticamente fases con el mismo nombre y color en jarras compartidas en la estufa.</p>
+                            </div>
+
+                            <!-- Botones Rápidos de Plantilla -->
+                            <div class="flex flex-wrap gap-2 pt-1">
+                                <span class="text-xs font-bold text-rose-400 self-center uppercase">Plantillas:</span>
+                                <button type="button" onclick="cargarPlantillaFases('clasica_postre')" class="text-xs bg-white border border-rose-200 hover:bg-rose-100 text-rose-800 font-bold px-3 py-1.5 rounded-xl transition shadow-xs">
+                                    + Base + Betún
+                                </button>
+                                <button type="button" onclick="cargarPlantillaFases('postre_3fases')" class="text-xs bg-white border border-rose-200 hover:bg-rose-100 text-rose-800 font-bold px-3 py-1.5 rounded-xl transition shadow-xs">
+                                    + Base + Betún + Topper
+                                </button>
+                                <button type="button" onclick="agregarFilaFaseProducto()" class="text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl transition shadow-xs">
+                                    + Añadir Fase Personalizada
+                                </button>
+                            </div>
+
+                            <!-- Contenedor dinámico de tarjetas de fases -->
+                            <div id="contenedor-fases-prod" class="space-y-3 pt-2"></div>
+                        </div>
+
+                        <!-- Insumos Físicos de la Vela de Postre -->
+                        <div class="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                            <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                                <div>
+                                    <h4 class="font-bold text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span>📦</span> Insumos Físicos (Envase, Pabilos, Adornos)
+                                    </h4>
+                                    <p class="text-[11px] text-slate-500">Se descontarán del taller por cada vela producida.</p>
+                                </div>
+                                <button type="button" onclick="agregarFilaInsumoFisico()" class="text-xs text-rose-600 font-bold hover:underline">
+                                    + Añadir Insumo
+                                </button>
+                            </div>
+
+                            <div id="contenedor-insumos-fisicos" class="space-y-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- MODO ESTÁNDAR (1 VERTIDO / SIMPLE) -->
+                    <div id="panel-modo-estandar" class="space-y-3">
+                        <div id="panel-mapeo-genericos" class="bg-rose-50 p-3.5 rounded-xl border border-rose-200 hidden">
+                            <label class="block text-xs font-bold text-rose-900 mb-1.5 uppercase tracking-wider">Asignación de Aromas / Esencias:</label>
+                            <div id="contenedor-mapeo-genericos" class="space-y-2"></div>
+                        </div>
+
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                            <label class="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer">
+                                <input type="checkbox" id="check-receta-propia" onchange="toggleRecetaPropia()" class="w-4 h-4 text-rose-600 rounded">
+                                ¿Este producto usa una fórmula especial en vez de la general de su categoría?
+                            </label>
+                            <p class="text-[11px] text-slate-500 mt-1">Si está desmarcado, usará automáticamente la fórmula base asignada a su categoría.</p>
+                        </div>
+                        
+                        <div id="panel-receta-propia" class="border-t border-slate-200 pt-3 hidden space-y-2">
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Fórmula Especial (Desglose de insumos por vela):</label>
+                            <div id="contenedor-receta-prod" class="space-y-2"></div>
+                            <button type="button" onclick="agregarFilaIngredienteProd()" class="text-xs text-rose-600 font-bold hover:underline inline-block">+ Añadir insumo a la fórmula</button>
+                        </div>
+                    </div>
+
+                    <!-- Colección de Temporada (Opcional) -->
+                    <div class="bg-rose-50/50 p-4 rounded-2xl border-2 border-rose-200 space-y-2">
+                        <label class="flex items-center gap-2.5 text-xs font-bold text-rose-950 cursor-pointer select-none">
+                            <input type="checkbox" id="check-prod-temporada" onchange="toggleOpcionesTemporadaForm()" class="w-4 h-4 text-rose-500 rounded focus:ring-rose-400">
+                            <span>¿Es producto de temporada? (Colección especial que se pausa parte del año)</span>
+                        </label>
+                        <div id="panel-prod-temporada-opciones" class="hidden pt-2 border-t border-rose-200/80 flex items-center justify-between gap-3">
+                            <span class="text-xs text-rose-900 font-bold">Estado de la temporada:</span>
+                            <select id="prod-temporada-estado" class="border-2 border-rose-200 p-2 rounded-xl text-xs font-bold bg-white text-rose-950 focus:outline-none">
+                                <option value="1">☀️ Activo (En temporada actual)</option>
+                                <option value="0">❄️ Pausado (Fuera de temporada)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Botones Guardar / Cancelar -->
+                    <div class="flex gap-3 pt-3 border-t border-rose-100">
+                        <button id="btn-guardar-prod" onclick="guardarProductoTerminado()" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white px-5 py-3.5 rounded-xl text-sm font-bold shadow-md shadow-rose-200 transition active:scale-[0.98]">
+                            💾 Guardar Producto
+                        </button>
+                        <button type="button" onclick="limpiarFormularioProducto()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3.5 rounded-xl text-sm font-bold transition">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECCIÓN 3: REGISTRAR PRODUCCIÓN MASIVA -->
+        <!-- ========================================== -->
+        <section id="pestana-produccion" class="space-y-6 hidden">
+            <!-- TARJETA FORMULARIO PRODUCCIÓN -->
+            <!-- TARJETA FORMULARIO PRODUCCIÓN -->
+            <div class="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border-2 border-rose-100 space-y-6">
+                <div class="border-b border-rose-100 pb-4">
+                    <h2 class="text-xl sm:text-2xl font-black text-rose-950 flex items-center gap-2">
+                        <span>⚡</span> Registrar Jornada de Producción
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-500 font-medium">Registra la fecha, la persona responsable y los productos fabricados. Los insumos se descontarán del taller automáticamente.</p>
+                </div>
+
+                <!-- METADATOS DE PRODUCCIÓN (OPERADOR Y FECHA) -->
+                <div class="bg-rose-50/70 p-5 rounded-2xl border-2 border-rose-200 grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <!-- Operador / Responsable -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-xs font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>👤</span> Responsable de Producción:
+                            </label>
+                            <button type="button" onclick="abrirModalOperador()" class="text-xs text-rose-600 font-bold hover:underline">+ Nuevo operador</button>
+                        </div>
+                        <select id="operador-lote" class="w-full border-2 border-rose-200 p-3.5 rounded-2xl text-sm sm:text-base font-bold text-rose-950 bg-white focus:ring-4 focus:ring-rose-100 focus:border-rose-400 focus:outline-none cursor-pointer">
+                            <option value="">Selecciona operador responsable...</option>
+                        </select>
+                    </div>
+
+                    <!-- Fecha de Producción -->
+                    <div>
+                        <label class="block text-xs font-black text-rose-950 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                            <span>📅</span> Fecha de Producción:
+                        </label>
+                        <input type="date" id="fecha-produccion-input" class="w-full border-2 border-rose-200 p-3.5 rounded-2xl text-sm sm:text-base font-bold text-rose-900 bg-white focus:ring-4 focus:ring-rose-100 focus:border-rose-400 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- PRODUCTOS FABRICADOS -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-black text-rose-950 uppercase tracking-wider">Productos Fabricados en esta Jornada:</label>
+                    <div id="contenedor-lote-productos" class="space-y-3"></div>
+                    <button type="button" onclick="agregarFilaProductoLote()" class="text-xs sm:text-sm text-rose-600 font-black hover:text-rose-800 bg-rose-50 px-4 py-2.5 rounded-xl border border-rose-200 transition inline-block">
+                        + Agregar otro producto a la jornada
+                    </button>
+                </div>
+
+                <!-- INSUMOS ADICIONALES / MERMAS -->
+                <div class="border-t border-rose-100 pt-4 space-y-3">
+                    <label class="block text-xs font-black text-rose-950 uppercase tracking-wider">Insumos Adicionales / Mermas / Pruebas (Opcional):</label>
+                    <div id="contenedor-insumos-extra" class="space-y-2"></div>
+                    <button type="button" onclick="agregarFilaInsumoExtra()" class="text-xs sm:text-sm text-rose-600 font-bold hover:text-rose-800 inline-block">
+                        + Añadir insumo extra a la jornada
+                    </button>
+                </div>
+
+                <!-- BOTÓN PRINCIPAL PROCESAR PRODUCCIÓN -->
+                <button onclick="procesarProduccionMúltiple()" class="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-2xl text-base font-black shadow-md shadow-rose-200 transition active:scale-[0.99] flex items-center justify-center gap-2">
+                    <span>⚡</span>
+                    <span>Procesar Producción y Descontar Insumos del Taller</span>
+                </button>
+            </div>
+
+            <!-- HISTORIAL PESTAÑA 3 -->
+            <div class="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border-2 border-rose-100 space-y-4">
+                <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-black text-rose-950 flex items-center gap-2">
+                            <span>📜</span> Historial de Producción Registrada
+                        </h3>
+                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Histórico de fabricaciones. Cada registro permanece guardado permanentemente a menos que decidas eliminarlo manualmente.</p>
+                    </div>
+                    <button onclick="cargarHistorialProduccion()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl border border-rose-200 transition">
+                        🔄 Refrescar Historial
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
+                                <th class="p-4">Fecha</th>
+                                <th class="p-4">Operador / Responsable</th>
+                                <th class="p-4">Productos Fabricados</th>
+                                <th class="p-4 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial-produccion" class="divide-y divide-rose-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECCIÓN 4: FICHAS TÉCNICAS & CALCULADORA -->
+        <!-- ========================================== -->
+        <section id="pestana-fichas" class="space-y-6 hidden">
+            <!-- CALCULADORA DE PREPARACIÓN DE MEZCLA -->
+            <div class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border-2 border-rose-200 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-rose-100 pb-3">
+                    <h2 class="text-xl sm:text-2xl font-black text-rose-950 flex items-center gap-2">
+                        <span>🧮</span> Calculadora de Mezcla por Lote & Proporción de Ceras
+                    </h2>
+                    <span class="text-xs bg-rose-100 text-rose-800 px-3 py-1 rounded-full font-bold">Cálculo en Tiempo Real</span>
+                </div>
+
+                <p class="text-xs sm:text-sm text-slate-600 font-medium">Indica los productos y piezas a fabricar. El sistema desglosará automáticamente los gramajes exactos por jarra/olla a calentar sin alterar el inventario.</p>
+
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold text-rose-950 uppercase tracking-wider">Selecciona Productos y Cantidad a Producir:</label>
+                    <div id="contenedor-filas-calculadora" class="space-y-2"></div>
+                    
+                    <button onclick="agregarFilaCalculadora()" class="text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 px-3.5 py-2 rounded-xl border border-rose-200 shadow-xs inline-block">
+                        + Agregar otro producto al cálculo
+                    </button>
+                </div>
+
+                <!-- RESULTADO DE CALCULADORA (DESGLOSE CLARO Y GRANDE) -->
+                <div class="mt-6 bg-rose-50/40 p-5 sm:p-6 rounded-2xl border-2 border-rose-200 space-y-4">
+                    <div class="flex justify-between items-center border-b border-rose-200 pb-3">
+                        <h3 class="font-black text-rose-950 text-base sm:text-lg flex items-center gap-2">
+                            <span>🧪</span> Desglose de Insumos y Jarras a Calentar en Taller:
+                        </h3>
+                        <button onclick="agregarInsumoExtraCalculadora()" class="text-xs text-rose-700 font-bold hover:underline">+ Agregar insumo especial (Colorante/Betún)</button>
+                    </div>
+
+                    <div id="resultado-calculadora-insumos" class="space-y-3">
+                        <p class="text-slate-400 italic text-sm">Selecciona una vela y cantidad arriba para ver las jarras a calentar...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FICHAS TÉCNICAS / PROCEDIMIENTO CON FOTOGRAFÍA -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- FORMULARIO DE EDICIÓN Y CREACIÓN DE FICHA -->
+                <div class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 lg:col-span-5 space-y-4">
+                    <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                        <h2 id="titulo-form-ficha" class="text-lg sm:text-xl font-black text-rose-950">Crear / Editar Ficha Técnica</h2>
+                        <button onclick="limpiarFormularioFicha()" class="text-xs text-rose-600 font-bold hover:underline">Limpiar / Nuevo</button>
+                    </div>
+                    
+                    <!-- Selector de Producto -->
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Selecciona Producto Terminado:</label>
+                        <select id="ficha-producto-id" onchange="cargarDatosFichaAlSeleccionar()" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                            <option value="">Selecciona vela o producto...</option>
+                        </select>
+                    </div>
+
+                    <!-- FOTOGRAFÍA DE REFERENCIA -->
+                    <div class="bg-rose-50/50 p-4 rounded-2xl border-2 border-dashed border-rose-200 space-y-2">
+                        <label class="block text-xs font-extrabold text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>📸</span> Fotografía de Referencia de la Vela Terminada:
+                        </label>
+                        <p class="text-[11px] text-slate-500">Sube una foto clara para que el equipo de taller vea los colores, betún y decorado.</p>
+                        
+                        <div class="flex items-center gap-3">
+                            <input type="file" id="ficha-foto-input" accept="image/*" class="hidden" onchange="procesarFotoFicha(event)">
+                            <button type="button" onclick="document.getElementById('ficha-foto-input').click()" class="bg-white hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl text-xs border border-rose-300 shadow-xs transition flex items-center gap-1.5">
+                                <span>📷</span> Seleccionar Fotografía
+                            </button>
+                            <button type="button" id="btn-quitar-foto" onclick="quitarFotoFicha()" class="text-xs text-red-500 font-bold hover:underline hidden">
+                                Quitar foto
+                            </button>
+                        </div>
+                        
+                        <input type="hidden" id="ficha-foto-url">
+                        
+                        <!-- Preview de Foto en el Formulario -->
+                        <div id="ficha-foto-preview-container" class="hidden pt-2">
+                            <img id="ficha-foto-preview" src="" alt="Vista previa vela" class="w-full max-h-48 object-cover rounded-xl border border-rose-200 shadow-xs cursor-pointer hover:opacity-90" onclick="ampliarFoto(this.src)">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Calibre / Tipo de Pabilo:</label>
+                        <input type="text" id="ficha-pabilo" placeholder="Ej. Calibre 22 Algodón / Pabilo de Madera" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-rose-400 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Temperatura de Mezcla y Vertido:</label>
+                        <input type="text" id="ficha-temperatura" placeholder="Ej. Base: 70°C. Betún: batir a 40°C-45°C" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-rose-400 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Técnicas Especiales / Decorado:</label>
+                        <input type="text" id="ficha-tecnica" placeholder="Ej. Base rosa + betún batido + frutilla en molde" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-rose-400 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Desglose de Gramos por Fase / Colores:</label>
+                        <textarea id="ficha-gramos" rows="3" placeholder="Ej. Base: 120g Cera Soya (Rosa). Betún: 40g Soya + 40g Coco (Blanco)." class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-rose-400 focus:outline-none"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Notas / Comentarios para Fabricación:</label>
+                        <textarea id="ficha-notas" rows="3" placeholder="Ej. Batir la cera de coco a velocidad media hasta consistencia cremosa..." class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-rose-400 focus:outline-none"></textarea>
+                    </div>
+
+                    <button onclick="guardarFichaTecnica()" class="w-full bg-rose-500 hover:bg-rose-600 text-white py-3.5 rounded-xl text-sm font-black shadow-md shadow-rose-200 transition active:scale-[0.98]">
+                        💾 Guardar / Actualizar Ficha Técnica
+                    </button>
+                </div>
+
+                <!-- VISOR DE TARJETAS DE FICHAS TÉCNICAS -->
+                <div class="bg-white p-5 sm:p-7 rounded-2xl shadow-sm border border-rose-100 lg:col-span-7 space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-rose-100 pb-3">
+                        <div>
+                            <h2 class="text-xl sm:text-2xl font-black text-rose-950 flex items-center gap-2">
+                                <span>📘</span> Fichas Técnicas Registradas
+                            </h2>
+                            <p class="text-xs text-slate-500 font-medium">Guías de fabricación con fotografía y especificaciones.</p>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <select id="filtro-cat-ficha" onchange="renderizarFichasTecnicas()" class="border-2 border-rose-200 p-2 rounded-xl text-xs font-bold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                                <option value="">Todas las familias</option>
+                            </select>
+                            <input type="text" id="buscar-ficha" oninput="renderizarFichasTecnicas()" placeholder="🔍 Buscar ficha..." class="border-2 border-rose-200 p-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20 w-full sm:w-44">
+                        </div>
+                    </div>
+
+                    <div id="contenedor-tarjetas-fichas" class="grid grid-cols-1 gap-5 max-h-[850px] overflow-y-auto pr-2"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECCIÓN 5: PLAN DEL DÍA & CHECKLIST -->
+        <!-- ========================================== -->
+        <section id="pestana-plan" class="space-y-6 hidden">
+            <div class="bg-white p-5 sm:p-7 rounded-3xl shadow-sm border-2 border-rose-100 space-y-6">
+                <!-- ENCABEZADO Y CONTROLES DEL DÍA -->
+                <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-4 border-b border-rose-100 pb-4">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-black text-rose-950 flex items-center gap-2">
+                            <span>📋</span> Plan del Día & Metas de Trabajo
+                        </h2>
+                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Asigna metas diarias, tareas por operador y sigue el avance del taller en tiempo real.</p>
+                    </div>
+
+                    <!-- Selector de Fecha & Atajos -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label class="text-xs font-black text-rose-950 uppercase tracking-wider">Fecha del Plan:</label>
+                        <input type="date" id="plan-fecha-input" onchange="cambiarFechaPlan()" class="border-2 border-rose-200 p-2.5 rounded-xl text-sm font-bold text-rose-950 bg-rose-50/30 focus:ring-2 focus:ring-rose-400 focus:outline-none">
+                        <button type="button" onclick="irFechaPlan('hoy')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl text-xs border border-rose-200 transition shadow-2xs">
+                            📅 Hoy
+                        </button>
+                        <button type="button" onclick="irFechaPlan('manana')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl text-xs border border-rose-200 transition shadow-2xs">
+                            ⏩ Mañana
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 1. CHECKLIST Y TAREAS HASTA ARRIBA -->
+                <div class="space-y-4">
+                    <!-- FILTRO POR OPERADOR (PESTAÑITAS / PILLS) -->
+                    <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                        <span class="text-xs font-bold text-rose-950 uppercase tracking-wider whitespace-nowrap">Ver Checklist:</span>
+                        <div id="pills-filtro-operador" class="flex items-center gap-1.5 flex-wrap">
+                            <button type="button" onclick="filtrarTareasOperador('TODOS')" class="pill-operador active-pill bg-rose-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-xs transition" data-op="TODOS">
+                                👥 Todos los Operadores
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR DE CHECKLIST AGRUPADO POR OPERADOR -->
+                    <div id="contenedor-checklist-operadores" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                        <!-- Se llena dinámicamente con las tarjetas de cada operador -->
+                    </div>
+                </div>
+
+                <!-- 2. FORMULARIO: AGREGAR TAREA AL PLAN DEL DÍA -->
+                <div class="bg-rose-50/40 p-5 rounded-3xl border-2 border-rose-200 space-y-4">
+                    <div class="flex justify-between items-center border-b border-rose-200 pb-2">
+                        <h3 class="text-sm font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>➕</span> Asignar Nueva Meta / Tarea al Plan
+                        </h3>
+                        <button type="button" onclick="abrirModalOperador()" class="text-xs text-rose-600 font-bold hover:underline">+ Gestionar Operadores</button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <!-- Fila 1: Operador, Tarea, Cantidad, Botón -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            <!-- Operador -->
+                            <div class="sm:col-span-3">
+                                <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Para quién es:</label>
+                                <select id="nueva-tarea-operador" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-bold text-rose-950 bg-white focus:ring-2 focus:ring-rose-400 focus:outline-none">
+                                    <option value="">Selecciona operador...</option>
+                                </select>
+                            </div>
+
+                            <!-- Descripción de la tarea -->
+                            <div class="sm:col-span-5">
+                                <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Tarea / Actividad a realizar:</label>
+                                <input type="text" id="nueva-tarea-desc" placeholder="Ej. Fabricar Sprays Vainilla / Etiquetar cajas / Asear mesas..." class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white text-rose-950" onkeydown="if(event.key==='Enter') agregarTareaPlan()">
+                            </div>
+
+                            <!-- Cantidad Opcional -->
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Meta Cantidad (Opc.):</label>
+                                <input type="number" id="nueva-tarea-cantidad" placeholder="Ej. 20" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white text-rose-950" onkeydown="if(event.key==='Enter') agregarTareaPlan()">
+                            </div>
+
+                            <!-- Botón Agregar -->
+                            <div class="sm:col-span-2">
+                                <button type="button" onclick="agregarTareaPlan()" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold p-2.5 rounded-xl text-sm shadow-md shadow-rose-200 transition active:scale-95 flex items-center justify-center gap-1.5">
+                                    <span>➕</span>
+                                    <span>Asignar Tarea</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Fila 2: Producto (con buscador y categorías) + Nota Opcional -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            <!-- Asociar a Producto (Opcional con buscador) -->
+                            <div class="sm:col-span-6">
+                                <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Producto Opcional (con buscador y categorías):</label>
+                                <select id="nueva-tarea-producto-id" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-rose-400 focus:outline-none">
+                                    <option value="">Ninguno / General</option>
+                                </select>
+                            </div>
+
+                            <!-- Nota Opcional para la tarea -->
+                            <div class="sm:col-span-6">
+                                <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Nota Opcional para esta Tarea:</label>
+                                <input type="text" id="nueva-tarea-nota" placeholder="Ej. Usar mechas de madera #22 / Etiqueta dorada de lote / Caja blanca..." class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white text-rose-950" onkeydown="if(event.key==='Enter') agregarTareaPlan()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. AVISOS / ADVERTENCIAS DEL DÍA (MENSAJE DEL JEFE) HASTA ABAJO -->
+                <div class="bg-amber-50/80 p-5 rounded-3xl border-2 border-amber-200 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>⚠️</span> Notas, Avisos & Advertencias del Jefe para este Día:
+                        </label>
+                        <span id="badge-guardando-notas" class="text-[11px] font-bold text-amber-700 hidden">Guardando...</span>
+                    </div>
+                    <textarea id="plan-notas-input" onchange="guardarNotasPlan()" rows="2" placeholder="Escribe aquí advertencias o puntos a considerar para el equipo de hoy (ej. Cuidado al batir cera de soya con la temperatura, hoy llega pedido de frascos a las 3:00pm, priorizar aromatizantes)..." class="w-full border-2 border-amber-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-amber-400 focus:outline-none bg-white text-slate-800"></textarea>
+                    <div class="flex justify-between items-center text-[11px] text-amber-800">
+                        <span>💡 Se guarda automáticamente al escribir o salir del campo.</span>
+                        <button type="button" onclick="guardarNotasPlan()" class="text-amber-900 font-bold hover:underline">
+                            💾 Guardar Notas Ahora
+                        </button>
+                    </div>
+                </div>
+            </div></section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODALES DEL SISTEMA -->
+    <!-- ========================================== -->
+
+    <!-- MODAL GESTOR DE CATEGORÍA (CREAR / EDITAR) -->
+    <div id="modal-categoria" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border-2 border-rose-100">
+            <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                <h3 id="modal-cat-titulo" class="font-black text-rose-950 text-lg">Nueva Categoría</h3>
+                <button type="button" onclick="cerrarModalCategoria()" class="text-slate-400 hover:text-rose-600 font-bold text-xl leading-none">✕</button>
+            </div>
+
+            <input type="hidden" id="modal-cat-id">
+            <input type="hidden" id="modal-cat-tipo">
+
+            <!-- Selector de Nivel Jerárquico: Principal vs Subcategoría -->
+            <div>
+                <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-2">Tipo de Categoría:</label>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" id="btn-tipo-cat-principal" onclick="seleccionarTipoJerarquia('principal')" class="p-3.5 rounded-2xl border-2 border-rose-500 bg-rose-50/60 text-rose-950 font-bold text-xs flex flex-col items-center gap-1 transition">
+                        <span class="text-xl">📁</span>
+                        <span>Categoría Principal</span>
+                        <span class="text-[10px] font-normal text-rose-600">(Carpeta Raíz)</span>
+                    </button>
+                    <button type="button" id="btn-tipo-cat-sub" onclick="seleccionarTipoJerarquia('sub')" class="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-600 font-bold text-xs flex flex-col items-center gap-1 transition">
+                        <span class="text-xl">↳</span>
+                        <span>Subcategoría</span>
+                        <span class="text-[10px] font-normal text-slate-400">(Dentro de otra)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Selector de Categoría Principal (visible si es subcategoría) -->
+            <div id="campo-modal-cat-padre" class="hidden">
+                <label class="block text-xs font-bold text-rose-900 mb-1">¿A qué Categoría Principal pertenecerá?</label>
+                <select id="modal-cat-padre-select" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                    <option value="">Selecciona una categoría principal...</option>
+                </select>
+            </div>
+
+            <!-- Nombre de la Categoría -->
+            <div>
+                <label class="block text-xs font-bold text-rose-900 mb-1">Nombre de la Categoría:</label>
+                <input type="text" id="modal-cat-nombre" placeholder="Ej. Ceras, Esencias, Velas Golden, Sprays..." class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none" onkeydown="if(event.key==='Enter') guardarModalCategoria()">
+                <p id="modal-cat-explicacion" class="text-xs text-slate-500 mt-1.5 font-medium">
+                    💡 Las <strong>Categorías Principales</strong> agrupan familias completas (ej. Ceras, Velas de Postre).
+                </p>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="flex gap-2.5 pt-3 border-t border-rose-100">
+                <button type="button" onclick="guardarModalCategoria()" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-xs shadow-md shadow-rose-200 transition">
+                    💾 Guardar Categoría
+                </button>
+                <button type="button" onclick="cerrarModalCategoria()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-3 rounded-xl text-xs transition">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FÓRMULA BASE DE CATEGORÍA DE PRODUCTOS -->
+    <div id="modal-receta-cat" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] flex flex-col border-2 border-rose-100">
+            <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                <div>
+                    <h3 class="font-black text-rose-950 text-base">🧪 Fórmula Base de Categoría</h3>
+                    <p id="modal-receta-cat-nombre" class="text-xs text-rose-600 font-bold">Categoría</p>
+                </div>
+                <button type="button" onclick="cerrarModalRecetaCat()" class="text-slate-400 hover:text-rose-600 font-bold text-xl leading-none">✕</button>
+            </div>
+
+            <input type="hidden" id="modal-receta-cat-id">
+
+            <div class="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 text-xs text-rose-950 leading-relaxed font-medium">
+                💡 <strong>¿Cómo funciona?</strong> Todos los productos que agregues a esta categoría consumirán automáticamente estos insumos por cada vela producida, ahorrándote escribir la receta en cada una.
+            </div>
+
+            <div class="flex-1 overflow-y-auto pr-1 space-y-2">
+                <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider">Insumos y Cantidades por Vela:</label>
+                <div id="contenedor-receta-cat-modal" class="space-y-2"></div>
+                <button type="button" onclick="agregarFilaIngredienteCatModal()" class="text-xs text-rose-600 font-bold hover:text-rose-800 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-100 transition inline-block">
+                    + Añadir Insumo a la Fórmula
+                </button>
+            </div>
+
+            <div class="flex gap-2.5 pt-3 border-t border-rose-100">
+                <button type="button" onclick="guardarRecetaCategoriaModal()" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-xs shadow-md shadow-rose-200 transition">
+                    💾 Guardar Fórmula Base
+                </button>
+                <button type="button" onclick="cerrarModalRecetaCat()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-3 rounded-xl text-xs transition">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL AGREGAR / GESTIONAR OPERADORES DE TALLER -->
+    <div id="modal-operador" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border-2 border-rose-100">
+            <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                <h3 class="font-black text-rose-950 text-lg flex items-center gap-2">
+                    <span>👥</span> Equipo / Operadores de Taller
+                </h3>
+                <button type="button" onclick="cerrarModalOperador()" class="text-slate-400 hover:text-rose-600 font-bold text-xl leading-none">✕</button>
+            </div>
+
+            <p class="text-xs text-slate-500 font-medium">Registra los nombres de las personas del equipo para asignarlas como responsables de cada lote producido.</p>
+
+            <!-- Input Nuevo Operador -->
+            <div class="flex gap-2">
+                <input type="text" id="nuevo-operador-nombre" placeholder="Nombre (ej. Mariana, Leo, Sofia)..." class="flex-1 border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none" onkeydown="if(event.key==='Enter') crearOperador()">
+                <button type="button" onclick="crearOperador()" class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-4 py-3 rounded-xl text-xs shadow-md shadow-rose-200 transition whitespace-nowrap">
+                    + Agregar
+                </button>
+            </div>
+
+            <!-- Lista de operadores existentes -->
+            <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                <label class="block text-[11px] font-bold text-rose-400 uppercase tracking-wider">Operadores Registrados:</label>
+                <div id="lista-operadores-modal" class="space-y-1.5"></div>
+            </div>
+
+            <div class="pt-3 border-t border-rose-100">
+                <button type="button" onclick="cerrarModalOperador()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ZOOM FOTOGRAFÍA DE VELA -->
+    <div id="modal-foto-zoom" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden" onclick="cerrarFotoZoom()">
+        <div class="relative max-w-3xl max-h-[90vh] p-2 bg-white rounded-3xl shadow-2xl border-4 border-rose-300" onclick="event.stopPropagation()">
+            <button onclick="cerrarFotoZoom()" class="absolute -top-3 -right-3 bg-rose-500 text-white w-8 h-8 rounded-full font-black text-sm flex items-center justify-center shadow-lg hover:bg-rose-600">✕</button>
+            <img id="img-foto-zoom" src="" alt="Vela ampliada" class="w-full max-h-[80vh] object-contain rounded-2xl">
+        </div>
+    </div>
+
+    <!-- PANTALLA DE ACCESO POR PIN DE 6 DÍGITOS -->
+    <div id="pantalla-login-pin" class="fixed inset-0 bg-[#FFF5F7]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 sm:p-8 space-y-6 border-2 border-rose-200 text-center">
+            <div class="space-y-2">
+                <span class="text-4xl inline-block animate-bounce">🕯️</span>
+                <h2 class="text-xl sm:text-2xl font-black text-rose-950">Acceso al Taller</h2>
+                <p class="text-xs text-slate-500 font-medium">Ingresa el PIN de 6 dígitos del taller para desbloquear el sistema.</p>
+            </div>
+
+            <!-- Display de 6 dígitos -->
+            <div class="flex justify-center items-center gap-2" id="contenedor-pin-dots">
+                <div class="pin-caja w-10 h-12 rounded-2xl border-2 border-rose-200 bg-rose-50/40 flex items-center justify-center text-xl font-black text-rose-950 transition" data-idx="0">-</div>
+                <div class="pin-caja w-10 h-12 rounded-2xl border-2 border-rose-200 bg-rose-50/40 flex items-center justify-center text-xl font-black text-rose-950 transition" data-idx="1">-</div>
+                <div class="pin-caja w-10 h-12 rounded-2xl border-2 border-rose-200 bg-rose-50/40 flex items-center justify-center text-xl font-black text-rose-950 transition" data-idx="2">-</div>
+                <div class="pin-caja w-10 h-12 rounded-2xl border-2 border-rose-200 bg-rose-50/40 flex items-center justify-center text-xl font-black text-rose-950 transition" data-idx="3">-</div>
+                <div class="pin-caja w-10 h-12 rounded-2xl border-2 border-rose-200 bg-rose-50/40 flex items-center justify-center text-xl font-black text-rose-950 transition" data-idx="4">-</div>
+                <div class="pin-caja w-10 h-12 rounded-2xl border-2 border-rose-200 bg-rose-50/40 flex items-center justify-center text-xl font-black text-rose-950 transition" data-idx="5">-</div>
+            </div>
+
+            <p id="error-pin-msg" class="text-xs font-bold text-red-500 min-h-[18px]"></p>
+
+            <!-- Teclado Numérico Cute Pastel -->
+            <div class="grid grid-cols-3 gap-2.5 max-w-[240px] mx-auto">
+                <button type="button" onclick="presionarTeclaPin('1')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">1</button>
+                <button type="button" onclick="presionarTeclaPin('2')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">2</button>
+                <button type="button" onclick="presionarTeclaPin('3')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">3</button>
+                <button type="button" onclick="presionarTeclaPin('4')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">4</button>
+                <button type="button" onclick="presionarTeclaPin('5')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">5</button>
+                <button type="button" onclick="presionarTeclaPin('6')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">6</button>
+                <button type="button" onclick="presionarTeclaPin('7')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">7</button>
+                <button type="button" onclick="presionarTeclaPin('8')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">8</button>
+                <button type="button" onclick="presionarTeclaPin('9')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">9</button>
+                <button type="button" onclick="limpiarPin()" class="h-12 rounded-2xl border-2 border-rose-100 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition active:scale-95 shadow-2xs">Borrar</button>
+                <button type="button" onclick="presionarTeclaPin('0')" class="h-12 rounded-2xl border-2 border-rose-100 bg-white hover:bg-rose-50 text-rose-950 font-black text-lg transition active:scale-95 shadow-2xs">0</button>
+                <button type="button" onclick="borrarUltimoDigitoPin()" class="h-12 rounded-2xl border-2 border-rose-100 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-sm transition active:scale-95 shadow-2xs">⌫</button>
+            </div>
+
+            <p class="text-[11px] text-slate-400">🔐 Sistema Protegido del Taller</p>
+            
+        </div>
+    </div>
+
+    <!-- MODAL SELECCIONAR QUIÉN ERES HOY (PERFIL DE OPERADOR) -->
+    <div id="modal-seleccionar-perfil" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border-2 border-rose-200 text-center">
+            <span class="text-3xl">👥</span>
+            <h3 class="text-lg font-black text-rose-950">¿Quién está en el taller hoy?</h3>
+            <p class="text-xs text-slate-500 font-medium">Selecciona tu nombre para personalizar tu checklist del día y tus producciones.</p>
+
+            <div id="contenedor-botones-perfil" class="grid grid-cols-2 gap-2.5 pt-2 max-h-56 overflow-y-auto">
+                <!-- Se llena con operadores existentes -->
+            </div>
+
+            <div class="pt-3 border-t border-rose-100 flex justify-between items-center text-xs">
+                <button type="button" onclick="abrirModalOperador()" class="text-rose-600 font-bold hover:underline">+ Nueva persona</button>
+                <button type="button" onclick="cerrarSelectorPerfil()" class="text-slate-400 hover:text-slate-600 font-bold">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- MODAL CAMBIAR PIN DE ACCESO -->
+    <div id="modal-cambiar-pin" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border-2 border-rose-200">
+            <div class="flex justify-between items-center border-b border-rose-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🔑</span>
+                    <h3 class="font-black text-rose-950 text-base">Cambiar PIN del Taller</h3>
+                </div>
+                <button type="button" onclick="cerrarModalCambiarPin()" class="text-slate-400 hover:text-rose-600 font-bold text-xl leading-none">✕</button>
+            </div>
+
+            <p class="text-xs text-slate-500 font-medium">Ingresa el PIN actual del taller y define el nuevo PIN de 6 dígitos.</p>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-rose-900 mb-1 uppercase tracking-wider">PIN Actual (6 dígitos):</label>
+                    <input type="password" maxlength="6" id="input-pin-actual" placeholder="Ej. 123456" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-center font-mono font-bold text-lg focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-rose-900 mb-1 uppercase tracking-wider">Nuevo PIN (6 dígitos):</label>
+                    <input type="password" maxlength="6" id="input-pin-nuevo" placeholder="6 dígitos numéricos" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-center font-mono font-bold text-lg focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-rose-900 mb-1 uppercase tracking-wider">Confirmar Nuevo PIN:</label>
+                    <input type="password" maxlength="6" id="input-pin-confirmar" placeholder="Repite los 6 dígitos" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-center font-mono font-bold text-lg focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                </div>
+            </div>
+
+            <p id="msg-cambiar-pin" class="text-xs font-bold min-h-[16px] text-center"></p>
+
+            <div class="flex gap-2.5 pt-2 border-t border-rose-100">
+                <button type="button" onclick="procesarCambioPin()" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-xs shadow-md shadow-rose-200 transition active:scale-95">
+                    💾 Guardar Nuevo PIN
+                </button>
+                <button type="button" onclick="cerrarModalCambiarPin()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-3 rounded-xl text-xs transition">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
