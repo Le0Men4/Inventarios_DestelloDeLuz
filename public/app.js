@@ -3170,26 +3170,58 @@ function calcularFórmulaLote() {
                         }
                     });
 
-                    // Si esta vela estándar contiene ceras, crear / acumular en la Olla de Fundición
+                    // Si esta vela estándar contiene ceras, crear / acumular en la Olla de Fundición unificada por AROMA
                     const totalCerasUnit = soyaEstandarUnit + cocoEstandarUnit + ceraOtraUnit;
                     if (totalCerasUnit > 0) {
-                        const catObj = categoriasProductosLista.find(c => c.id == prod.categoria_id);
-                        const catNombre = catObj ? catObj.nombre : 'Base Estándar';
-                        const nombreOllaKey = `Cera Base (${catNombre})`;
+                        // Extraer el nombre del aroma de la receta o del nombre del producto
+                        let nombreAromaFase = '';
+                        let esenciaGramosUnit = 0;
+
+                        receta.forEach(ing => {
+                            let insumoIdFinal = ing.insumo_id;
+                            const sust = mapeos.find(m => m.insumo_generico_id === ing.insumo_id);
+                            if (sust) insumoIdFinal = sust.insumo_especifico_id;
+
+                            const insumo = insumosLista.find(i => i.id === insumoIdFinal);
+                            const nomIns = insumo ? insumo.nombre : '';
+                            const catIns = normalizarTexto(insumo?.categoria || '');
+                            const nomNorm = normalizarTexto(nomIns);
+
+                            if (catIns.includes('esencia') || catIns.includes('aroma') || nomNorm.includes('esencia') || nomNorm.includes('aroma')) {
+                                nombreAromaFase = nomIns.replace(/^Esencia\s+(de\s+)?/i, '').replace(/^Aroma\s+(de\s+)?/i, '').trim();
+                                esenciaGramosUnit = ing.cantidad_requerida;
+                            }
+                        });
+
+                        if (!nombreAromaFase) {
+                            // Si no tiene insumo con categoría 'esencia', extraer aroma del nombre del producto
+                            nombreAromaFase = prod.nombre.replace(/^Vela\s+(Golden\s+)?/i, '').replace(/\s+(Chica|Grande|Mediana|Mini|Extra)$/i, '').trim() || 'Estándar';
+                        }
+
+                        // Juntar por Aroma (ej. "Mezcla: Sándalo") para que Chica, Mediana o Grande se preparen en la misma olla
+                        const nombreOllaKey = `Mezcla: ${nombreAromaFase}`;
 
                         if (!jarrasFusionadasLote[nombreOllaKey]) {
                             jarrasFusionadasLote[nombreOllaKey] = {
-                                nombreOlla: `Cera Base (${catNombre})`,
-                                color: 'Natural',
-                                tipoFase: 'Base Estándar',
+                                nombreOlla: `Mezcla: ${nombreAromaFase}`,
+                                color: 'Natural / Aroma',
+                                tipoFase: `Velas ${nombreAromaFase}`,
                                 soya: 0,
                                 coco: 0,
+                                esenciaGramos: 0,
+                                pesoTotalEsperado: 0,
                                 origenProductos: []
                             };
                         }
 
-                        jarrasFusionadasLote[nombreOllaKey].soya += (soyaEstandarUnit + ceraOtraUnit) * piezas;
-                        jarrasFusionadasLote[nombreOllaKey].coco += (cocoEstandarUnit * piezas);
+                        const soyaPura = (soyaEstandarUnit + ceraOtraUnit) * piezas;
+                        const cocoPura = cocoEstandarUnit * piezas;
+                        const esenciaTotal = esenciaGramosUnit * piezas;
+
+                        jarrasFusionadasLote[nombreOllaKey].soya += soyaPura;
+                        jarrasFusionadasLote[nombreOllaKey].coco += cocoPura;
+                        jarrasFusionadasLote[nombreOllaKey].esenciaGramos += esenciaTotal;
+                        jarrasFusionadasLote[nombreOllaKey].pesoTotalEsperado += (soyaPura + cocoPura + esenciaTotal);
 
                         const infoProd = `${piezas}x ${prod.nombre}`;
                         if (!jarrasFusionadasLote[nombreOllaKey].origenProductos.includes(infoProd)) {
