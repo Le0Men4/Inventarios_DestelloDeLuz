@@ -1,6 +1,31 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+
+// Función global para fecha y hora fija en CDMX (America/Mexico_City)
+function getFechaHoraCDMX() {
+    const ahora = new Date();
+    // Formato ISO local en zona horaria America/Mexico_City: YYYY-MM-DD HH:mm:ss
+    const partes = new Intl.DateTimeFormat('es-MX', {
+        timeZone: 'America/Mexico_City',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    }).formatToParts(ahora);
+
+    const p = {};
+    partes.forEach(part => { p[part.type] = part.value; });
+    return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+}
+
+function getFechaCDMX() {
+    return getFechaHoraCDMX().slice(0, 10);
+}
+
 const fs = require('fs');
 const app = express();
 const PORT = 3000;
@@ -298,7 +323,7 @@ app.post('/api/insumos', (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             const insumoId = this.lastID;
             if (initialStock > 0) {
-                db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote) VALUES (?, ?, 'ENTRADA', 'STOCK_INICIAL')`, [insumoId, initialStock], () => {});
+                db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote, fecha) VALUES (?, ?, 'ENTRADA', 'STOCK_INICIAL', getFechaHoraCDMX())`, [insumoId, initialStock], () => {});
             }
             res.json({ id: insumoId });
         });
@@ -321,7 +346,7 @@ app.patch('/api/insumos/:id/stock', (req, res) => {
     db.serialize(() => {
         db.run(`UPDATE insumos SET stock = stock + ? WHERE id = ?`, [numCant, req.params.id], function(err) {
             if (err) return res.status(500).json({ error: err.message });
-            db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote) VALUES (?, ?, ?, 'MANUAL')`, 
+            db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote, fecha) VALUES (?, ?, ?, 'MANUAL', getFechaHoraCDMX())`, 
                 [req.params.id, Math.abs(numCant), numCant > 0 ? 'ENTRADA' : 'RESTA'], () => {
                 res.json({ success: true });
             });
@@ -701,7 +726,7 @@ app.post('/api/produccion-multiple', (req, res) => {
     const { productos_lote, insumos_adicionales, operador, fecha_produccion } = req.body;
     if (!productos_lote || productos_lote.length === 0) return res.status(400).json({ error: "No hay productos seleccionados" });
 
-    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const fechaHoy = getFechaCDMX();
     const operadorFinal = (operador && operador.trim()) ? operador.trim() : 'Taller';
     const fechaProdFinal = (fecha_produccion && fecha_produccion.trim()) ? fecha_produccion.trim() : fechaHoy;
 
@@ -817,7 +842,7 @@ app.post('/api/produccion-multiple', (req, res) => {
         const insumosJson = JSON.stringify(consumosTotales);
         const prodsJson = JSON.stringify(productos_lote);
 
-        db.run(`INSERT INTO historial_produccion (operador, fecha_produccion, detalle, resumen, insumos_json, productos_json, detalles_json) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+        db.run(`INSERT INTO historial_produccion (operador, fecha_produccion, detalle, resumen, insumos_json, productos_json, detalles_json, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, getFechaHoraCDMX())`, 
             [operadorFinal, fechaProdFinal, detalleTexto, detalleTexto, insumosJson, prodsJson, prodsJson], 
             function(err) {
                 if (err) {

@@ -1,3 +1,23 @@
+
+// Función maestra que actualiza y sincroniza todos los módulos, tablas y selectores en vivo
+async function refrescarTodoElProyecto() {
+    try {
+        await cargarCategorias();
+        await cargarInsumos();
+        await cargarProductos();
+        await cargarRecetasYMapeos();
+        await cargarFichasTecnicas();
+        await cargarOperadores();
+        await cargarHistoriales();
+        poblarSelectorProductosFicha();
+        poblarSelectoresCalculadora();
+        if (typeof cargarPlanDiario === 'function') {
+            await cargarPlanDiario();
+        }
+    } catch(e) {
+        console.error("Error sincronizando proyecto:", e);
+    }
+}
 let insumosLista = [];
 let productosLista = [];
 let categoriasInsumosLista = [];
@@ -916,18 +936,21 @@ async function cargarInsumos() {
             });
         }
 
-        // Filtro estricto de Colección / Temporada para Insumos
-        if (filtroTemporada === 'linea') {
-            // Solo de línea: no se muestran todos los pausados y de temporada
+        // Filtro estricto de Colección / Temporada / Alerta de Stock para Insumos
+        if (filtroTemporada === 'stock_bajo') {
+            // ALERTA DE STOCK: filtra solo insumos con stock menor o igual al mínimo configurado
+            listaMostrar = listaMostrar.filter(i => {
+                const minStockVal = parseFloat(localStorage.getItem(`min_stock_insumo_${i.id}`) || '5');
+                return i.stock <= minStockVal;
+            });
+        } else if (filtroTemporada === 'linea') {
             listaMostrar = listaMostrar.filter(i => i.es_temporada !== 1 && i.activa !== 0 && i.categoria_activa !== 0 && i.categoria_padre_activa !== 0);
         } else if (filtroTemporada === 'temporada') {
-            // Solo de temporada: no se muestran ni los pausados ni los de línea
             listaMostrar = listaMostrar.filter(i => i.es_temporada === 1 && i.activa !== 0 && i.categoria_activa !== 0 && i.categoria_padre_activa !== 0);
         } else if (filtroTemporada === 'pausados') {
-            // Pausados: no se muestran ni los de línea ni los de temporada que estén activos
             listaMostrar = listaMostrar.filter(i => (i.activa === 0) || (i.categoria_activa === 0) || (i.categoria_padre_activa === 0));
         } else {
-            // "todos los productos / insumos": no se mostrarán los que estén pausados pero todos los demás sí (línea y temporada activos)
+            // 'todos': no se muestran pausados
             listaMostrar = listaMostrar.filter(i => (i.activa !== 0) && (i.categoria_activa !== 0) && (i.categoria_padre_activa !== 0));
         }
 
@@ -1072,18 +1095,20 @@ async function cargarProductos() {
             });
         }
 
-        // Filtro estricto de Colección / Temporada para Productos
-        if (filtroTemporada === 'linea') {
-            // Solo de línea: no se muestran todos los pausados y de temporada
+        // Filtro estricto de Colección / Temporada / Alerta de Stock para Productos
+        if (filtroTemporada === 'stock_bajo') {
+            // ALERTA DE STOCK: filtra solo productos terminados con stock menor o igual al mínimo configurado
+            listaMostrar = listaMostrar.filter(p => {
+                const minStockVal = parseFloat(localStorage.getItem(`min_stock_prod_${p.id}`) || '3');
+                return p.stock <= minStockVal;
+            });
+        } else if (filtroTemporada === 'linea') {
             listaMostrar = listaMostrar.filter(p => p.es_temporada !== 1 && p.activa !== 0 && p.categoria_activa !== 0 && p.categoria_padre_activa !== 0);
         } else if (filtroTemporada === 'temporada') {
-            // Solo de temporada: no se muestran ni los pausados ni los de línea
             listaMostrar = listaMostrar.filter(p => p.es_temporada === 1 && p.activa !== 0 && p.categoria_activa !== 0 && p.categoria_padre_activa !== 0);
         } else if (filtroTemporada === 'pausados') {
-            // Pausados: no se muestran ni los de línea ni los de temporada que estén activos
             listaMostrar = listaMostrar.filter(p => (p.activa === 0) || (p.categoria_activa === 0) || (p.categoria_padre_activa === 0));
         } else {
-            // "todos los productos": no se mostrarán los que estén pausados pero todos los demás sí (línea y temporada activos)
             listaMostrar = listaMostrar.filter(p => (p.activa !== 0) && (p.categoria_activa !== 0) && (p.categoria_padre_activa !== 0));
         }
 
@@ -1399,8 +1424,7 @@ async function guardarInsumo() {
         if (res.ok) {
             alert(editId ? '¡Insumo actualizado exitosamente!' : '¡Insumo agregado al taller exitosamente!');
             limpiarFormularioInsumo();
-            await cargarInsumos();
-            await cargarCategorias();
+            await refrescarTodoElProyecto();
         } else {
             const err = await res.json();
             alert('Error al guardar insumo: ' + (err.error || 'Ocurrió un error'));
@@ -4210,5 +4234,39 @@ async function alternarTemporadaInsumo(insumoId) {
         }
     } catch(e) {
         console.error("Error al alternar temporada de insumo:", e);
+    }
+}
+
+// Control de modo vista: Computadora vs Teléfono
+function alternarModoVista() {
+    const body = document.body;
+    const esMovilActual = body.classList.contains('modo-movil-forzado');
+    const nuevoModo = !esMovilActual;
+    aplicarModoVista(nuevoModo);
+    localStorage.setItem('modo_vista_taller', nuevoModo ? 'movil' : 'escritorio');
+}
+
+function aplicarModoVista(esMovil) {
+    const body = document.body;
+    const btnTexto = document.getElementById('texto-switch-vista');
+    const btnIcono = document.getElementById('icono-switch-vista');
+    
+    if (esMovil) {
+        body.classList.add('modo-movil-forzado');
+        if (btnTexto) btnTexto.innerText = 'Vista Computadora';
+        if (btnIcono) btnIcono.innerText = '💻';
+    } else {
+        body.classList.remove('modo-movil-forzado');
+        if (btnTexto) btnTexto.innerText = 'Vista Celular';
+        if (btnIcono) btnIcono.innerText = '📱';
+    }
+}
+
+function restaurarModoVista() {
+    const modo = localStorage.getItem('modo_vista_taller');
+    if (modo === 'movil') {
+        aplicarModoVista(true);
+    } else {
+        aplicarModoVista(false);
     }
 }

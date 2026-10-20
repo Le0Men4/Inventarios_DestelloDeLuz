@@ -63,8 +63,34 @@
             font-weight: 700;
         }
     </style>
+
+    <!-- Estilos responsivos & Modo Vista Teléfono / Escritorio -->
+    <style id="estilos-modo-vista">
+        body.modo-movil-forzado {
+            background-color: #F8E7EB !important;
+            display: flex;
+            justify-content: center;
+        }
+        body.modo-movil-forzado #app-root-container {
+            width: 100% !important;
+            max-width: 440px !important;
+            margin: 0 auto !important;
+            box-shadow: 0 25px 50px -12px rgba(180, 83, 9, 0.25), 0 0 0 10px #2D3748 !important;
+            border-radius: 40px !important;
+            overflow-x: hidden !important;
+            min-height: 92vh !important;
+            margin-top: 20px !important;
+            margin-bottom: 20px !important;
+            background: #FFF5F7 !important;
+        }
+        body.modo-movil-forzado header {
+            border-top-left-radius: 30px;
+            border-top-right-radius: 30px;
+        }
+    </style>
 </head>
 <body class="bg-[#FFF5F7] font-sans text-slate-800 antialiased min-h-screen flex flex-col">
+    <div id="app-root-container" class="flex flex-col min-h-screen w-full transition-all duration-300">
 
     <!-- HEADER / ENCABEZADO CUTE PASTEL -->
     <!-- HEADER / ENCABEZADO CUTE PASTEL (COLOR FIJO ROSA) -->
@@ -80,6 +106,11 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <!-- Botón Switch Vista Teléfono / Computadora -->
+                <button type="button" onclick="alternarModoVista()" id="btn-switch-vista" class="text-xs bg-white text-rose-950 px-3 py-1.5 rounded-full font-black border border-white/40 flex items-center gap-1.5 shadow-xs hover:bg-rose-50 transition active:scale-95" title="Cambiar entre vista de teléfono y computadora">
+                    <span id="icono-switch-vista">📱</span>
+                    <span id="texto-switch-vista">Vista Celular</span>
+                </button>
                 <button type="button" onclick="abrirSelectorPerfil()" id="btn-perfil-activo" class="text-xs bg-white text-rose-950 px-3.5 py-1.5 rounded-full font-bold border border-white/40 flex items-center gap-1.5 shadow-xs hover:bg-rose-50 transition active:scale-95" title="Cambiar persona activa">
                     <span>👤</span>
                     <span id="texto-perfil-activo">Elegir Perfil</span>
@@ -161,6 +192,7 @@
                                 <option value="linea">✨ Solo de Línea</option>
                                 <option value="temporada">🍁 Solo de Temporada</option>
                                 <option value="pausados">❄️ Pausados (Fuera de Temp.)</option>
+                                <option value="stock_bajo">⚠️ Alerta de Stock Bajo</option>
                             </select>
                         </div>
                     </div>
@@ -345,6 +377,7 @@
                                 <option value="linea">✨ Solo de Línea</option>
                                 <option value="temporada">🍁 Solo de Temporada</option>
                                 <option value="pausados">❄️ Pausados (Fuera de Temp.)</option>
+                                <option value="stock_bajo">⚠️ Alerta de Stock Bajo</option>
                             </select>
                         </div>
                     </div>
@@ -1059,7 +1092,7 @@
     </div>
 
     <!-- PANTALLA DE ACCESO POR PIN DE 6 DÍGITOS -->
-    <div id="pantalla-login-pin" class="fixed inset-0 bg-[#FFF5F7]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div id="pantalla-login-pin" class="fixed inset-0 bg-[#FFF5F7]/95 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 sm:p-8 space-y-6 border-2 border-rose-200 text-center">
             <div class="space-y-2">
                 <span class="text-4xl inline-block animate-bounce">🕯️</span>
@@ -1162,5 +1195,6 @@
     </div>
 
     <script src="app.js"></script>
+    </div>
 </body>
 </html>
