@@ -319,7 +319,8 @@ app.post('/api/insumos', (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             const insumoId = this.lastID;
             if (initialStock > 0) {
-                db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote, fecha) VALUES (?, ?, 'ENTRADA', 'STOCK_INICIAL', getFechaHoraCDMX())`, [insumoId, initialStock], () => {});
+                const fechaCDMX = getFechaHoraCDMX();
+                db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote, fecha) VALUES (?, ?, 'ENTRADA', 'STOCK_INICIAL', ?)`, [insumoId, initialStock, fechaCDMX], () => {});
             }
             res.json({ id: insumoId });
         });
@@ -339,13 +340,13 @@ app.patch('/api/insumos/:id/stock', (req, res) => {
     const numCant = parseFloat(cantidad);
     if (isNaN(numCant) || numCant === 0) return res.status(400).json({ error: "Cantidad inválida" });
 
-    db.serialize(() => {
-        db.run(`UPDATE insumos SET stock = stock + ? WHERE id = ?`, [numCant, req.params.id], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote, fecha) VALUES (?, ?, ?, 'MANUAL', getFechaHoraCDMX())`, 
-                [req.params.id, Math.abs(numCant), numCant > 0 ? 'ENTRADA' : 'RESTA'], () => {
-                res.json({ success: true });
-            });
+    db.run(`UPDATE insumos SET stock = stock + ? WHERE id = ?`, [numCant, req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        const fechaCDMX = getFechaHoraCDMX();
+        db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote, fecha) VALUES (?, ?, ?, 'MANUAL', ?)`, 
+            [req.params.id, Math.abs(numCant), numCant > 0 ? 'ENTRADA' : 'RESTA', fechaCDMX], (errH) => {
+            if (errH) console.error("Error al registrar historial_insumos:", errH);
+            res.json({ success: true });
         });
     });
 });
@@ -371,7 +372,7 @@ app.delete('/api/insumos/:id', (req, res) => {
 
 // --- API HISTORIAL INSUMOS ---
 app.get('/api/historial-insumos', (req, res) => {
-    db.all(`SELECT h.*, i.nombre as insumo_nombre, i.unidad FROM historial_insumos h JOIN insumos i ON h.insumo_id = i.id ORDER BY h.fecha DESC LIMIT 50`, [], (err, rows) => {
+    db.all(`SELECT h.*, COALESCE(i.nombre, 'Insumo Eliminado') as insumo_nombre, COALESCE(i.unidad, '') as unidad FROM historial_insumos h LEFT JOIN insumos i ON h.insumo_id = i.id ORDER BY h.fecha DESC LIMIT 100`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
@@ -607,13 +608,13 @@ app.patch('/api/productos-terminados/:id/stock', (req, res) => {
     const numCant = parseFloat(cantidad);
     if (isNaN(numCant) || numCant === 0) return res.status(400).json({ error: "Cantidad inválida" });
 
-    db.serialize(() => {
-        db.run(`UPDATE productos_terminados SET stock = stock + ? WHERE id = ?`, [numCant, req.params.id], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            db.run(`INSERT INTO historial_productos (producto_id, cantidad, tipo, origen) VALUES (?, ?, ?, 'MANUAL')`, 
-                [req.params.id, Math.abs(numCant), numCant > 0 ? 'ENTRADA' : 'RESTA'], () => {
-                res.json({ success: true });
-            });
+    db.run(`UPDATE productos_terminados SET stock = stock + ? WHERE id = ?`, [numCant, req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        const fechaCDMX = getFechaHoraCDMX();
+        db.run(`INSERT INTO historial_productos (producto_id, cantidad, tipo, origen, fecha) VALUES (?, ?, ?, 'MANUAL', ?)`, 
+            [req.params.id, Math.abs(numCant), numCant > 0 ? 'ENTRADA' : 'RESTA', fechaCDMX], (errH) => {
+            if (errH) console.error("Error al registrar historial_productos:", errH);
+            res.json({ success: true });
         });
     });
 });
@@ -639,7 +640,7 @@ app.delete('/api/productos-terminados/:id', (req, res) => {
 
 // --- API HISTORIAL PRODUCTOS TERMINADOS ---
 app.get('/api/historial-productos', (req, res) => {
-    db.all(`SELECT h.*, p.nombre as producto_nombre FROM historial_productos h JOIN productos_terminados p ON h.producto_id = p.id ORDER BY h.fecha DESC LIMIT 50`, [], (err, rows) => {
+    db.all(`SELECT h.*, COALESCE(p.nombre, 'Producto Eliminado') as producto_nombre FROM historial_productos h LEFT JOIN productos_terminados p ON h.producto_id = p.id ORDER BY h.fecha DESC LIMIT 100`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
@@ -859,8 +860,9 @@ app.post('/api/produccion-multiple', (req, res) => {
         const insumosJson = JSON.stringify(consumosTotales);
         const prodsJson = JSON.stringify(productos_lote);
 
-        db.run(`INSERT INTO historial_produccion (operador, fecha_produccion, detalle, resumen, insumos_json, productos_json, detalles_json, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, getFechaHoraCDMX())`, 
-            [operadorFinal, fechaProdFinal, detalleTexto, detalleTexto, insumosJson, prodsJson, prodsJson], 
+        const fechaCDMX = getFechaHoraCDMX();
+        db.run(`INSERT INTO historial_produccion (operador, fecha_produccion, detalle, resumen, insumos_json, productos_json, detalles_json, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, 
+            [operadorFinal, fechaProdFinal, detalleTexto, detalleTexto, insumosJson, prodsJson, prodsJson, fechaCDMX], 
             function(err) {
                 if (err) {
                     console.error("Error al guardar historial_produccion:", err);
@@ -874,15 +876,15 @@ app.post('/api/produccion-multiple', (req, res) => {
                 for (let insumoId in consumosTotales) {
                     const cantConsumo = consumosTotales[insumoId];
                     db.run(`UPDATE insumos SET stock = stock - ? WHERE id = ?`, [cantConsumo, insumoId]);
-                    db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote) VALUES (?, ?, 'SALIDA', ?)`,
-                        [insumoId, cantConsumo, refUnica]);
+                    db.run(`INSERT INTO historial_insumos (insumo_id, cantidad, tipo, codigo_lote, fecha) VALUES (?, ?, 'SALIDA', ?, ?)`,
+                        [insumoId, cantConsumo, refUnica, fechaCDMX]);
                 }
 
                 // 3. Incrementar stock de productos y registrar en historial_productos con referencia única
                 for (let item of productos_lote) {
                     db.run(`UPDATE productos_terminados SET stock = stock + ? WHERE id = ?`, [item.cantidad, item.producto_id]);
-                    db.run(`INSERT INTO historial_productos (producto_id, cantidad, tipo, origen, operador, codigo_lote) VALUES (?, ?, 'ENTRADA', 'PRODUCCION', ?, ?)`,
-                        [item.producto_id, item.cantidad, operadorFinal, refUnica]);
+                    db.run(`INSERT INTO historial_productos (producto_id, cantidad, tipo, origen, operador, codigo_lote, fecha) VALUES (?, ?, 'ENTRADA', 'PRODUCCION', ?, ?, ?)`,
+                        [item.producto_id, item.cantidad, operadorFinal, refUnica, fechaCDMX]);
                 }
 
                 res.json({ 
