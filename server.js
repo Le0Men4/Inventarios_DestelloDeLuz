@@ -39,11 +39,7 @@ if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const dbFile = path.join(__dirname, 'inventario.db');
-const db = new sqlite3.Database(dbFile, (err) => {
-    if (err) console.error("Error al abrir base de datos:", err.message);
-    else console.log("Conectado a la base de datos SQLite.");
-});
+const db = require('./database');
 
 db.serialize(() => {
     db.run("PRAGMA foreign_keys = ON");
