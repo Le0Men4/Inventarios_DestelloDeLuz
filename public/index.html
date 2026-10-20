@@ -64,28 +64,64 @@
         }
     </style>
 
-    <!-- Estilos responsivos & Modo Vista Teléfono / Escritorio -->
+        <!-- Estilos responsivos & Modo Vista Teléfono Ergonomía Total -->
     <style id="estilos-modo-vista">
+        /* Base para celulares reales o cuando se activa el switch a modo móvil */
         body.modo-movil-forzado {
-            background-color: #F8E7EB !important;
+            background-color: #E2E8F0 !important;
             display: flex;
             justify-content: center;
+            padding: 10px 0 !important;
         }
         body.modo-movil-forzado #app-root-container {
             width: 100% !important;
             max-width: 440px !important;
             margin: 0 auto !important;
-            box-shadow: 0 25px 50px -12px rgba(180, 83, 9, 0.25), 0 0 0 10px #2D3748 !important;
-            border-radius: 40px !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 12px #1E293B !important;
+            border-radius: 44px !important;
             overflow-x: hidden !important;
-            min-height: 92vh !important;
-            margin-top: 20px !important;
-            margin-bottom: 20px !important;
+            min-height: 94vh !important;
             background: #FFF5F7 !important;
         }
         body.modo-movil-forzado header {
-            border-top-left-radius: 30px;
-            border-top-right-radius: 30px;
+            border-top-left-radius: 32px;
+            border-top-right-radius: 32px;
+            padding: 1rem !important;
+        }
+
+        /* Optimizaciones táctiles cuando está en móvil forzado o en pantallas táctiles pequeñas (< 768px) */
+        @media (max-width: 768px), (max-width: 1024px) {
+            .mobile-stack-form {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        body.modo-movil-forzado input, 
+        body.modo-movil-forzado select, 
+        body.modo-movil-forzado button,
+        @media (max-width: 768px) {
+            input, select, button {
+                font-size: 14px !important;
+            }
+        }
+
+        /* Ajustes específicos de tablas en móvil forzado para evitar cortes */
+        body.modo-movil-forzado table th,
+        body.modo-movil-forzado table td {
+            padding: 0.6rem !important;
+            font-size: 12px !important;
+        }
+
+        body.modo-movil-forzado .grid-cols-2 {
+            grid-template-columns: 1fr !important;
+        }
+
+        body.modo-movil-forzado header h1 {
+            font-size: 1.1rem !important;
+        }
+
+        body.modo-movil-forzado .overflow-x-auto {
+            -webkit-overflow-scrolling: touch;
         }
     </style>
 </head>

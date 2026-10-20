@@ -1,4 +1,37 @@
 
+// Formateador de fecha y hora local fija para CDMX (America/Mexico_City)
+function formatearFechaCDMX(fechaOriginal) {
+    if (!fechaOriginal) return 'N/A';
+    try {
+        // Si ya viene con formato ISO o SQL YYYY-MM-DD HH:mm:ss
+        let str = String(fechaOriginal).trim();
+        // Si no tiene 'Z' ni offset y fue generada por SQLite CURRENT_TIMESTAMP, tratar como UTC
+        let d;
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
+            d = new Date(str.replace(' ', 'T') + 'Z');
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            return str;
+        } else {
+            d = new Date(str);
+        }
+
+        if (isNaN(d.getTime())) return str;
+
+        return d.toLocaleString('es-MX', {
+            timeZone: 'America/Mexico_City',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+    } catch(e) {
+        return String(fechaOriginal);
+    }
+}
+
 // Función maestra que actualiza y sincroniza todos los módulos, tablas y selectores en vivo
 async function refrescarTodoElProyecto() {
     try {
@@ -503,7 +536,7 @@ async function cargarHistorialInsumos() {
 
             tbody.innerHTML += `
                 <tr class="hover:bg-rose-50/50 transition border-b border-rose-100">
-                    <td class="p-3.5 text-slate-500 font-medium text-xs whitespace-nowrap">${h.fecha}</td>
+                    <td class="p-3.5 text-slate-500 font-medium text-xs whitespace-nowrap">${formatearFechaCDMX(h.fecha)}</td>
                     <td class="p-3.5 font-black text-rose-950 text-sm">${h.insumo_nombre}</td>
                     <td class="p-3.5">${tipoBadge}</td>
                     <td class="p-3.5 font-black text-rose-900 text-sm sm:text-base">${esEntrada ? '+' : '-'}${Math.abs(h.cantidad)} ${h.unidad || ''}</td>
@@ -566,7 +599,7 @@ async function cargarHistorialProductos() {
 
             tbody.innerHTML += `
                 <tr class="hover:bg-rose-50/50 transition border-b border-rose-100">
-                    <td class="p-3.5 text-slate-500 font-medium text-xs whitespace-nowrap">${h.fecha}</td>
+                    <td class="p-3.5 text-slate-500 font-medium text-xs whitespace-nowrap">${formatearFechaCDMX(h.fecha)}</td>
                     <td class="p-3.5 font-black text-rose-950 text-sm">${h.producto_nombre}</td>
                     <td class="p-3.5">${tipoBadge}</td>
                     <td class="p-3.5 font-black text-rose-900 text-sm sm:text-base">${esEntrada ? '+' : '-'}${Math.abs(h.cantidad)} pzas</td>
@@ -610,7 +643,7 @@ async function cargarHistorialProduccion() {
         }
 
         data.forEach(h => {
-            const fechaProd = h.fecha_produccion || (h.fecha ? h.fecha.slice(0, 10) : 'N/A');
+            const fechaProd = h.fecha_produccion ? h.fecha_produccion : (h.fecha ? formatearFechaCDMX(h.fecha) : 'N/A');
             const operadorBadge = `<span class="bg-rose-100 text-rose-900 border border-rose-300 px-3 py-1 rounded-xl text-xs font-black">👤 ${h.operador || 'Taller'}</span>`;
 
             tbody.innerHTML += `
@@ -2396,20 +2429,28 @@ function agregarFilaInsumoExtra() {
     const contenedor = document.getElementById('contenedor-insumos-extra');
     if (!contenedor) return;
     const div = document.createElement('div');
-    div.className = 'flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center fila-insumo-extra bg-white p-3 rounded-2xl border-2 border-rose-200 mb-2 shadow-xs';
+    div.className = 'flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center fila-insumo-extra bg-white p-3.5 rounded-2xl border-2 border-rose-200 mb-2.5 shadow-xs transition hover:border-rose-400';
 
     if (insumosLista.length === 0) return;
     let opcionesCascada = obtenerOpcionesInsumosCascada();
 
     div.innerHTML = `
-        <div class="flex-1">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Insumo extra / Merma:</label>
             <select class="border-2 border-rose-200 p-2.5 rounded-xl text-sm w-full sel-insumo-extra focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white font-bold text-rose-950">
                 ${opcionesCascada}
             </select>
         </div>
-        <div class="flex items-center gap-2 sm:w-44 self-end sm:self-center">
-            <input type="number" step="0.0001" min="0" placeholder="Cant. total" class="border-2 border-rose-200 p-2.5 rounded-xl text-sm w-full cant-insumo-extra focus:ring-2 focus:ring-rose-400 focus:outline-none font-black text-rose-900 bg-white shadow-2xs">
-            <button type="button" onclick="this.closest('.fila-insumo-extra').remove()" class="text-red-500 hover:text-red-700 bg-white hover:bg-red-50 border border-rose-200 font-bold px-3.5 py-2.5 rounded-xl text-sm transition">✕</button>
+        <div class="w-full lg:w-44">
+            <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Cantidad a descontar:</label>
+            <input type="number" step="0.0001" min="0" placeholder="Ej. 50" class="border-2 border-rose-200 p-2.5 rounded-xl text-sm w-full cant-insumo-extra focus:ring-2 focus:ring-rose-400 focus:outline-none font-black text-rose-900 bg-white shadow-2xs">
+        </div>
+        <div class="flex-1 min-w-[240px]">
+            <label class="block text-[11px] font-bold text-rose-900 uppercase mb-1">Motivo / Para qué se usó (Opcional):</label>
+            <input type="text" placeholder="Ej. Flores decorativas, merma, prueba de pabilo..." class="comentario-insumo-extra border-2 border-rose-200 p-2.5 rounded-xl text-xs sm:text-sm font-semibold text-rose-950 bg-rose-50/40 w-full focus:ring-2 focus:ring-rose-400 focus:outline-none">
+        </div>
+        <div class="self-end lg:self-end pb-0.5">
+            <button type="button" onclick="this.closest('.fila-insumo-extra').remove()" class="text-red-500 hover:text-red-700 bg-rose-50 hover:bg-red-100 border border-rose-200 font-bold px-3.5 py-2.5 rounded-xl text-sm transition" title="Eliminar fila">✕ Quitar</button>
         </div>
     `;
     contenedor.appendChild(div);
