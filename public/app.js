@@ -2999,12 +2999,28 @@ function calcularFórmulaLote() {
                 const tieneFases = prod.tipo_producto === 'postre' || (Array.isArray(fases) && fases.length > 0);
 
                 if (tieneFases && fases.length > 0) {
-                    // Ceras y Fases fusionadas
+                    // Ceras y Fases fusionadas con Desglose Inverso Exacto
                     fases.forEach(j => {
                         const nom = (j.nombre || 'Fase').trim();
                         const color = j.color || 'Sin Color';
                         const tipoFase = j.tipoFase || 'Base';
                         const nombreOllaKey = `${nom} [Color: ${color}] [Fase: ${tipoFase}]`;
+
+                        const soyaBruto = j.cera_soya !== undefined ? parseFloat(j.cera_soya) || 0 : (parseFloat(j.cera1GramosaUnidad) || 0);
+                        const cocoBruto = j.cera_coco !== undefined ? parseFloat(j.cera_coco) || 0 : (parseFloat(j.cera2GramosaUnidad) || 0);
+                        const totalFaseBrutaUnidad = (soyaBruto + cocoBruto);
+                        const totalFaseLote = totalFaseBrutaUnidad * piezas;
+
+                        // Desglose Inverso: El peso bruto (ej. 180g o 30g) ya incluye el aroma
+                        const pctAroma = (j.esencia_id ? (parseFloat(j.porcentaje_esencia) || 10) : 0);
+                        const grEsenciaLote = totalFaseLote * (pctAroma / 100);
+                        const grCeraPuraLote = totalFaseLote - grEsenciaLote;
+
+                        const factorSoya = totalFaseBrutaUnidad > 0 ? (soyaBruto / totalFaseBrutaUnidad) : 0;
+                        const factorCoco = totalFaseBrutaUnidad > 0 ? (cocoBruto / totalFaseBrutaUnidad) : 0;
+
+                        const soyaPuraLote = grCeraPuraLote * factorSoya;
+                        const cocoPuraLote = grCeraPuraLote * factorCoco;
 
                         if (!jarrasFusionadasLote[nombreOllaKey]) {
                             jarrasFusionadasLote[nombreOllaKey] = {
@@ -3013,52 +3029,49 @@ function calcularFórmulaLote() {
                                 tipoFase: tipoFase,
                                 soya: 0,
                                 coco: 0,
+                                esenciaGramos: 0,
+                                pesoTotalEsperado: 0,
                                 origenProductos: []
                             };
                         }
 
-                        const soyaUnit = j.cera_soya !== undefined ? j.cera_soya : (j.cera1GramosaUnidad || 0);
-                        const cocoUnit = j.cera_coco !== undefined ? j.cera_coco : (j.cera2GramosaUnidad || 0);
-
-                        jarrasFusionadasLote[nombreOllaKey].soya += (soyaUnit * piezas);
-                        jarrasFusionadasLote[nombreOllaKey].coco += (cocoUnit * piezas);
+                        // Jarras a fundir en estufa (pesos reales a fundir)
+                        jarrasFusionadasLote[nombreOllaKey].soya += soyaPuraLote;
+                        jarrasFusionadasLote[nombreOllaKey].coco += cocoPuraLote;
+                        jarrasFusionadasLote[nombreOllaKey].esenciaGramos += grEsenciaLote;
+                        jarrasFusionadasLote[nombreOllaKey].pesoTotalEsperado += totalFaseLote;
 
                         const infoProd = `${piezas}x ${prod.nombre}`;
                         if (!jarrasFusionadasLote[nombreOllaKey].origenProductos.includes(infoProd)) {
                             jarrasFusionadasLote[nombreOllaKey].origenProductos.push(infoProd);
                         }
 
-                        // Acumular Cera de Soya y Cera de Coco en insumos reales con su nombre real
-                        if (soyaUnit > 0) {
+                        // Acumular cera pura en desglose de insumos de taller
+                        if (soyaPuraLote > 0) {
                             if (!desglosadoInsumosReales[idSoya]) {
                                 desglosadoInsumosReales[idSoya] = { nombre: nombreSoya, unidad: unidadSoya, cantLoteTotal: 0, detalles: [] };
                             }
-                            desglosadoInsumosReales[idSoya].cantLoteTotal += (soyaUnit * piezas);
-                            desglosadoInsumosReales[idSoya].detalles.push(`${prod.nombre}: ${(soyaUnit * piezas).toFixed(1)}g`);
+                            desglosadoInsumosReales[idSoya].cantLoteTotal += soyaPuraLote;
+                            desglosadoInsumosReales[idSoya].detalles.push(`${prod.nombre}: ${soyaPuraLote.toFixed(1)}g`);
                         }
-                        if (cocoUnit > 0) {
+                        if (cocoPuraLote > 0) {
                             if (!desglosadoInsumosReales[idCoco]) {
                                 desglosadoInsumosReales[idCoco] = { nombre: nombreCoco, unidad: unidadCoco, cantLoteTotal: 0, detalles: [] };
                             }
-                            desglosadoInsumosReales[idCoco].cantLoteTotal += (cocoUnit * piezas);
-                            desglosadoInsumosReales[idCoco].detalles.push(`${prod.nombre}: ${(cocoUnit * piezas).toFixed(1)}g`);
+                            desglosadoInsumosReales[idCoco].cantLoteTotal += cocoPuraLote;
+                            desglosadoInsumosReales[idCoco].detalles.push(`${prod.nombre}: ${cocoPuraLote.toFixed(1)}g`);
                         }
 
-                        // Esencia de la fase si tiene
-                        if (j.esencia_id) {
-                            const pct = parseFloat(j.porcentaje_esencia) || 10;
-                            const totCeraFase = (soyaUnit + cocoUnit) * piezas;
-                            const grEsencia = totCeraFase * (pct / 100);
-                            if (grEsencia > 0) {
-                                const insEsencia = insumosLista.find(i => i.id == j.esencia_id);
-                                const nomEsencia = insEsencia ? insEsencia.nombre : 'Esencia / Aroma';
-                                const uniEsencia = insEsencia ? insEsencia.unidad : 'gramos';
-                                if (!desglosadoInsumosReales[j.esencia_id]) {
-                                    desglosadoInsumosReales[j.esencia_id] = { nombre: nomEsencia, unidad: uniEsencia, cantLoteTotal: 0, detalles: [] };
-                                }
-                                desglosadoInsumosReales[j.esencia_id].cantLoteTotal += grEsencia;
-                                desglosadoInsumosReales[j.esencia_id].detalles.push(`${prod.nombre}: ${grEsencia.toFixed(1)}g`);
+                        // Esencia desglosada
+                        if (j.esencia_id && grEsenciaLote > 0) {
+                            const insEsencia = insumosLista.find(i => i.id == j.esencia_id);
+                            const nomEsencia = insEsencia ? insEsencia.nombre : 'Esencia / Aroma';
+                            const uniEsencia = insEsencia ? insEsencia.unidad : 'gramos';
+                            if (!desglosadoInsumosReales[j.esencia_id]) {
+                                desglosadoInsumosReales[j.esencia_id] = { nombre: nomEsencia, unidad: uniEsencia, cantLoteTotal: 0, detalles: [] };
                             }
+                            desglosadoInsumosReales[j.esencia_id].cantLoteTotal += grEsenciaLote;
+                            desglosadoInsumosReales[j.esencia_id].detalles.push(`${prod.nombre}: ${grEsenciaLote.toFixed(1)}g`);
                         }
                     });
 
