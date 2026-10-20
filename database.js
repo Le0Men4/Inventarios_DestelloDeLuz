@@ -49,7 +49,6 @@ if (TURSO_URL && TURSO_AUTH_TOKEN) {
         },
         run(sql, params, callback) {
             const { args, cb } = normalizeArgs(params, callback);
-            // Ignorar errores de PRAGMA o ALTER TABLE duplicados silenciosamente
             client.execute({ sql, args })
                 .then(res => {
                     const ctx = {
@@ -66,6 +65,76 @@ if (TURSO_URL && TURSO_AUTH_TOKEN) {
                     console.error('[Turso db.run Error]:', err.message, 'SQL:', sql);
                     cb.call({ lastID: 0, changes: 0 }, err);
                 });
+        },
+        prepare(sql, callback) {
+            const queue = [];
+            let active = false;
+
+            const runNext = () => {
+                if (queue.length === 0) {
+                    active = false;
+                    return;
+                }
+                active = true;
+                const item = queue.shift();
+                client.execute({ sql, args: item.args })
+                    .then(res => {
+                        if (typeof item.cb === 'function') {
+                            item.cb.call({
+                                lastID: Number(res.lastInsertRowid || 0),
+                                changes: Number(res.rowsAffected || 0)
+                            }, null);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('[Turso stmt Error]:', err.message, 'SQL:', sql);
+                        if (typeof item.cb === 'function') {
+                            item.cb.call({ lastID: 0, changes: 0 }, err);
+                        }
+                    })
+                    .finally(() => {
+                        runNext();
+                    });
+            };
+
+            const stmtObj = {
+                run(...params) {
+                    let cb = null;
+                    let args = [];
+                    if (params.length > 0 && typeof params[params.length - 1] === 'function') {
+                        cb = params.pop();
+                    }
+                    if (params.length === 1 && Array.isArray(params[0])) {
+                        args = params[0];
+                    } else {
+                        args = params;
+                    }
+                    args = args.map(v => (v === undefined ? null : v));
+                    queue.push({ args, cb });
+                    if (!active) {
+                        runNext();
+                    }
+                    return stmtObj;
+                },
+                finalize(cb) {
+                    if (typeof cb === 'function') {
+                        if (!active && queue.length === 0) {
+                            cb(null);
+                        } else {
+                            const interval = setInterval(() => {
+                                if (!active && queue.length === 0) {
+                                    clearInterval(interval);
+                                    cb(null);
+                                }
+                            }, 25);
+                        }
+                    }
+                    return stmtObj;
+                }
+            };
+
+            if (typeof callback === 'function') callback(null, stmtObj);
+            return stmtObj;
         },
         serialize(fn) {
             if (typeof fn === 'function') fn();

@@ -404,40 +404,39 @@ app.get('/api/categorias-productos', (req, res) => {
 
 app.post('/api/categorias-productos', (req, res) => {
     const { nombre, padre_id, receta } = req.body;
-    db.serialize(() => {
-        db.run(`INSERT INTO categorias_productos (nombre, padre_id) VALUES (?, ?)`, [nombre, padre_id || null], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            const catId = this.lastID;
-            if (receta && receta.length > 0) {
-                const stmt = db.prepare(`INSERT INTO recetas_categorias (categoria_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`);
-                receta.forEach(r => stmt.run(catId, r.insumo_id, r.cantidad_requerida));
-                stmt.finalize();
+    db.run(`INSERT INTO categorias_productos (nombre, padre_id) VALUES (?, ?)`, [nombre, padre_id || null], async function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        const catId = this.lastID;
+        if (receta && receta.length > 0) {
+            for (const r of receta) {
+                await new Promise((resolve) => {
+                    db.run(`INSERT INTO recetas_categorias (categoria_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`,
+                        [catId, r.insumo_id, r.cantidad_requerida], () => resolve());
+                });
             }
-            res.json({ id: catId });
-        });
+        }
+        res.json({ id: catId });
     });
 });
 
 app.put('/api/categorias-productos/:id', (req, res) => {
     const catId = req.params.id;
     const { nombre, padre_id, receta } = req.body;
-    db.serialize(() => {
-        db.run(`UPDATE categorias_productos SET nombre = ?, padre_id = ? WHERE id = ?`, [nombre, padre_id || null, catId], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
+    db.run(`UPDATE categorias_productos SET nombre = ?, padre_id = ? WHERE id = ?`, [nombre, padre_id || null, catId], async (err) => {
+        if (err) return res.status(500).json({ error: err.message });
 
-            if (receta !== undefined) {
-                db.run(`DELETE FROM recetas_categorias WHERE categoria_id = ?`, [catId], () => {
-                    if (receta && receta.length > 0) {
-                        const stmt = db.prepare(`INSERT INTO recetas_categorias (categoria_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`);
-                        receta.forEach(r => stmt.run(catId, r.insumo_id, r.cantidad_requerida));
-                        stmt.finalize();
-                    }
-                    res.json({ success: true });
-                });
-            } else {
-                res.json({ success: true });
+        if (receta !== undefined) {
+            await new Promise((resolve) => db.run(`DELETE FROM recetas_categorias WHERE categoria_id = ?`, [catId], () => resolve()));
+            if (receta && receta.length > 0) {
+                for (const r of receta) {
+                    await new Promise((resolve) => {
+                        db.run(`INSERT INTO recetas_categorias (categoria_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`,
+                            [catId, r.insumo_id, r.cantidad_requerida], () => resolve());
+                    });
+                }
             }
-        });
+        }
+        res.json({ success: true });
     });
 });
 
@@ -529,56 +528,78 @@ app.patch('/api/productos-terminados/:id/fases', (req, res) => {
 
 app.post('/api/productos-terminados', (req, res) => {
     const { nombre, categoria_id, usa_receta_propia, tipo_producto, fases_json, receta, mapeo_genericos, es_temporada, activa } = req.body;
-    db.serialize(() => {
-        db.run(`INSERT INTO productos_terminados (nombre, categoria_id, stock, usa_receta_propia, tipo_producto, fases_json, es_temporada, activa) VALUES (?, ?, 0, ?, ?, ?, ?, ?)`,
-            [nombre, categoria_id, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1], function(err) {
-                if (err) return res.status(500).json({ error: err.message });
-                const prodId = this.lastID;
+    db.run(`INSERT INTO productos_terminados (nombre, categoria_id, stock, usa_receta_propia, tipo_producto, fases_json, es_temporada, activa) VALUES (?, ?, 0, ?, ?, ?, ?, ?)`,
+        [nombre, categoria_id, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1], async function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            const prodId = this.lastID;
 
-                if (receta && receta.length > 0) {
-                    const stmt = db.prepare(`INSERT INTO recetas_productos (producto_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`);
-                    receta.forEach(r => stmt.run(prodId, r.insumo_id, r.cantidad_requerida));
-                    stmt.finalize();
+            if (receta && receta.length > 0) {
+                try {
+                    for (const r of receta) {
+                        await new Promise((resolve) => {
+                            db.run(`INSERT INTO recetas_productos (producto_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`,
+                                [prodId, r.insumo_id, r.cantidad_requerida], () => resolve());
+                        });
+                    }
+                } catch(e) {
+                    console.error('Error insertando receta producto:', e);
                 }
+            }
 
-                if (mapeo_genericos && mapeo_genericos.length > 0) {
-                    const stmtM = db.prepare(`INSERT INTO mapeo_esencias_productos (producto_id, insumo_generico_id, insumo_especifico_id) VALUES (?, ?, ?)`);
-                    mapeo_genericos.forEach(m => stmtM.run(prodId, m.insumo_generico_id, m.insumo_especifico_id));
-                    stmtM.finalize();
+            if (mapeo_genericos && mapeo_genericos.length > 0) {
+                try {
+                    for (const m of mapeo_genericos) {
+                        await new Promise((resolve) => {
+                            db.run(`INSERT INTO mapeo_esencias_productos (producto_id, insumo_generico_id, insumo_especifico_id) VALUES (?, ?, ?)`,
+                                [prodId, m.insumo_generico_id, m.insumo_especifico_id], () => resolve());
+                        });
+                    }
+                } catch(e) {
+                    console.error('Error insertando mapeo_esencias:', e);
                 }
+            }
 
-                res.json({ id: prodId });
-            });
-    });
+            res.json({ id: prodId });
+        });
 });
 
 app.put('/api/productos-terminados/:id', (req, res) => {
     const prodId = req.params.id;
     const { nombre, categoria_id, usa_receta_propia, tipo_producto, fases_json, receta, mapeo_genericos, es_temporada, activa } = req.body;
-    db.serialize(() => {
-        db.run(`UPDATE productos_terminados SET nombre = ?, categoria_id = ?, usa_receta_propia = ?, tipo_producto = ?, fases_json = ?, es_temporada = ?, activa = ? WHERE id = ?`,
-            [nombre, categoria_id, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1, prodId], (err) => {
-                if (err) return res.status(500).json({ error: err.message });
+    db.run(`UPDATE productos_terminados SET nombre = ?, categoria_id = ?, usa_receta_propia = ?, tipo_producto = ?, fases_json = ?, es_temporada = ?, activa = ? WHERE id = ?`,
+        [nombre, categoria_id, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1, prodId], async (err) => {
+            if (err) return res.status(500).json({ error: err.message });
 
-                db.run(`DELETE FROM recetas_productos WHERE producto_id = ?`, [prodId], () => {
-                    if (receta && receta.length > 0) {
-                        const stmt = db.prepare(`INSERT INTO recetas_productos (producto_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`);
-                        receta.forEach(r => stmt.run(prodId, r.insumo_id, r.cantidad_requerida));
-                        stmt.finalize();
+            await new Promise((resolve) => db.run(`DELETE FROM recetas_productos WHERE producto_id = ?`, [prodId], () => resolve()));
+            if (receta && receta.length > 0) {
+                try {
+                    for (const r of receta) {
+                        await new Promise((resolve) => {
+                            db.run(`INSERT INTO recetas_productos (producto_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)`,
+                                [prodId, r.insumo_id, r.cantidad_requerida], () => resolve());
+                        });
                     }
-                });
+                } catch(e) {
+                    console.error('Error actualizando receta producto:', e);
+                }
+            }
 
-                db.run(`DELETE FROM mapeo_esencias_productos WHERE producto_id = ?`, [prodId], () => {
-                    if (mapeo_genericos && mapeo_genericos.length > 0) {
-                        const stmtM = db.prepare(`INSERT INTO mapeo_esencias_productos (producto_id, insumo_generico_id, insumo_especifico_id) VALUES (?, ?, ?)`);
-                        mapeo_genericos.forEach(m => stmtM.run(prodId, m.insumo_generico_id, m.insumo_especifico_id));
-                        stmtM.finalize();
+            await new Promise((resolve) => db.run(`DELETE FROM mapeo_esencias_productos WHERE producto_id = ?`, [prodId], () => resolve()));
+            if (mapeo_genericos && mapeo_genericos.length > 0) {
+                try {
+                    for (const m of mapeo_genericos) {
+                        await new Promise((resolve) => {
+                            db.run(`INSERT INTO mapeo_esencias_productos (producto_id, insumo_generico_id, insumo_especifico_id) VALUES (?, ?, ?)`,
+                                [prodId, m.insumo_generico_id, m.insumo_especifico_id], () => resolve());
+                        });
                     }
-                });
+                } catch(e) {
+                    console.error('Error actualizando mapeo_esencias:', e);
+                }
+            }
 
-                res.json({ success: true });
-            });
-    });
+            res.json({ success: true });
+        });
 });
 
 app.patch('/api/productos-terminados/:id/stock', (req, res) => {
