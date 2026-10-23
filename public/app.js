@@ -508,16 +508,62 @@ async function cargarHistoriales() {
     await cargarHistorialProduccion();
 }
 
+let historialInsumosAbierto = false;
+let historialProductosAbierto = false;
+
+function toggleHistorialDesplegable(tipo) {
+    if (tipo === 'insumos') {
+        historialInsumosAbierto = !historialInsumosAbierto;
+        const cont = document.getElementById('contenedor-desplegable-historial-insumos');
+        const icono = document.getElementById('icono-flecha-historial-insumos');
+        if (cont) {
+            if (historialInsumosAbierto) {
+                cont.classList.remove('hidden');
+                if (icono) icono.innerText = '▲ Ocultar Historial';
+                cargarHistorialInsumos();
+            } else {
+                cont.classList.add('hidden');
+                if (icono) icono.innerText = '▼ Ver Historial';
+            }
+        }
+    } else {
+        historialProductosAbierto = !historialProductosAbierto;
+        const cont = document.getElementById('contenedor-desplegable-historial-productos');
+        const icono = document.getElementById('icono-flecha-historial-productos');
+        if (cont) {
+            if (historialProductosAbierto) {
+                cont.classList.remove('hidden');
+                if (icono) icono.innerText = '▲ Ocultar Historial';
+                cargarHistorialProductos();
+            } else {
+                cont.classList.add('hidden');
+                if (icono) icono.innerText = '▼ Ver Historial';
+            }
+        }
+    }
+}
+
 async function cargarHistorialInsumos() {
     try {
-        const res = await fetch('/api/historial-insumos');
+        const limite = document.getElementById('limite-historial-insumos')?.value || '10';
+        const fecha = document.getElementById('filtro-fecha-historial-insumos')?.value || '';
+        let url = `/api/historial-insumos?limit=${limite}`;
+        if (fecha) url += `&fecha=${encodeURIComponent(fecha)}`;
+
+        const res = await fetch(url);
         const data = await res.json();
+        
+        const badgeCont = document.getElementById('badge-contador-historial-insumos');
+        if (badgeCont && Array.isArray(data)) {
+            badgeCont.innerText = `${data.length} movimientos`;
+        }
+
         const tbody = document.getElementById('tabla-historial-insumos');
         if (!tbody) return;
         tbody.innerHTML = '';
 
         if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-rose-300 font-bold">No hay movimientos recientes en insumos de taller.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-rose-300 font-bold">No hay movimientos registrados con los filtros seleccionados.</td></tr>`;
             return;
         }
 
@@ -559,7 +605,7 @@ async function eliminarMovimientoInsumo(id, nombreInsumo, cantidad, tipo) {
     const res = await fetch(`/api/historial-insumos/${id}`, { method: 'DELETE' });
     if (res.ok) {
         alert("Movimiento eliminado y stock actualizado correctamente.");
-        cargarInsumos();
+        await cargarInsumos(true);
         cargarHistorialInsumos();
     } else {
         alert("Error al eliminar el movimiento.");
@@ -568,14 +614,25 @@ async function eliminarMovimientoInsumo(id, nombreInsumo, cantidad, tipo) {
 
 async function cargarHistorialProductos() {
     try {
-        const res = await fetch('/api/historial-productos');
+        const limite = document.getElementById('limite-historial-productos')?.value || '10';
+        const fecha = document.getElementById('filtro-fecha-historial-productos')?.value || '';
+        let url = `/api/historial-productos?limit=${limite}`;
+        if (fecha) url += `&fecha=${encodeURIComponent(fecha)}`;
+
+        const res = await fetch(url);
         const data = await res.json();
+
+        const badgeCont = document.getElementById('badge-contador-historial-productos');
+        if (badgeCont && Array.isArray(data)) {
+            badgeCont.innerText = `${data.length} movimientos`;
+        }
+
         const tbody = document.getElementById('tabla-historial-productos');
         if (!tbody) return;
         tbody.innerHTML = '';
 
         if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-rose-300 font-bold">No hay entradas recientes en productos terminados.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-rose-300 font-bold">No hay entradas registradas con los filtros seleccionados.</td></tr>`;
             return;
         }
 
@@ -593,6 +650,8 @@ async function cargarHistorialProductos() {
                         <span class="bg-pink-100 text-pink-800 px-2.5 py-1 rounded-xl text-xs font-bold">👤 ${h.operador || 'Taller'}</span>
                     </div>
                 `;
+            } else if (h.codigo_lote === 'STOCK_INICIAL') {
+                origenHtml = `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-xl text-xs font-black">Stock Inicial</span>`;
             } else {
                 origenHtml = `<span class="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-xl text-xs font-semibold inline-flex items-center gap-1">✏️ Agregado manualmente</span>`;
             }
@@ -622,7 +681,7 @@ async function eliminarMovimientoProducto(id, nombreProd, cantidad, tipo) {
     const res = await fetch(`/api/historial-productos/${id}`, { method: 'DELETE' });
     if (res.ok) {
         alert("Movimiento eliminado y stock actualizado correctamente.");
-        cargarProductos();
+        await cargarProductos(true);
         cargarHistorialProductos();
     } else {
         alert("Error al eliminar el movimiento.");
@@ -1295,7 +1354,9 @@ function obtenerOpcionesInsumosCascada(insumoSeleccionadoId = null) {
     return html;
 }
 
-async function ajustarStockInsumo(id, signo = 1) {
+let stockUpdatingInsumo = {};
+async function ajustarStockInsumo(id, signo = 1, btnElem = null) {
+    if (stockUpdatingInsumo[id]) return;
     const input = document.getElementById(`sumar-stock-insumo-${id}`);
     if (!input) return;
     const val = parseFloat(input.value);
@@ -1303,20 +1364,47 @@ async function ajustarStockInsumo(id, signo = 1) {
     if (isNaN(val) || val === 0) return alert("Ingresa una cantidad válida.");
     const cantidad = val * signo;
 
-    const res = await fetch(`/api/insumos/${id}/stock`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cantidad })
-    });
+    stockUpdatingInsumo[id] = true;
+    if (btnElem) {
+        btnElem.disabled = true;
+        btnElem.classList.add('opacity-40');
+    }
 
-    if (res.ok) {
-        input.value = '';
-        cargarInsumos();
-        cargarHistorialInsumos();
+    const item = (insumosLista || []).find(i => i.id == id);
+    if (item) {
+        item.stock = Math.max(0, parseFloat(((item.stock || 0) + cantidad).toFixed(3)));
+        filtrarInsumosInstantaneo();
+    }
+    input.value = '';
+
+    try {
+        const res = await fetch(`/api/insumos/${id}/stock`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cantidad })
+        });
+        if (!res.ok) {
+            await cargarInsumos(true);
+        } else {
+            if (historialInsumosAbierto) {
+                cargarHistorialInsumos();
+            }
+        }
+    } catch(e) {
+        console.error("Error al actualizar stock de insumo:", e);
+        await cargarInsumos(true);
+    } finally {
+        stockUpdatingInsumo[id] = false;
+        if (btnElem) {
+            btnElem.disabled = false;
+            btnElem.classList.remove('opacity-40');
+        }
     }
 }
 
-async function ajustarStockProducto(id, signo = 1) {
+let stockUpdatingProd = {};
+async function ajustarStockProducto(id, signo = 1, btnElem = null) {
+    if (stockUpdatingProd[id]) return;
     const input = document.getElementById(`sumar-stock-prod-${id}`);
     if (!input) return;
     const val = parseFloat(input.value);
@@ -1324,16 +1412,41 @@ async function ajustarStockProducto(id, signo = 1) {
     if (isNaN(val) || val === 0) return alert("Ingresa una cantidad válida.");
     const cantidad = val * signo;
 
-    const res = await fetch(`/api/productos-terminados/${id}/stock`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cantidad })
-    });
+    stockUpdatingProd[id] = true;
+    if (btnElem) {
+        btnElem.disabled = true;
+        btnElem.classList.add('opacity-40');
+    }
 
-    if (res.ok) {
-        input.value = '';
-        cargarProductos();
-        cargarHistorialProductos();
+    const item = (productosLista || []).find(p => p.id == id);
+    if (item) {
+        item.stock = Math.max(0, Math.round((item.stock || 0) + cantidad));
+        filtrarProductosInstantaneo();
+    }
+    input.value = '';
+
+    try {
+        const res = await fetch(`/api/productos-terminados/${id}/stock`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cantidad })
+        });
+        if (!res.ok) {
+            await cargarProductos(true);
+        } else {
+            if (historialProductosAbierto) {
+                cargarHistorialProductos();
+            }
+        }
+    } catch(e) {
+        console.error("Error al actualizar stock de producto:", e);
+        await cargarProductos(true);
+    } finally {
+        stockUpdatingProd[id] = false;
+        if (btnElem) {
+            btnElem.disabled = false;
+            btnElem.classList.remove('opacity-40');
+        }
     }
 }
 
@@ -1440,18 +1553,24 @@ async function guardarInsumo() {
     const method = editId ? 'PUT' : 'POST';
 
     try {
+        const payload = { 
+            nombre, 
+            categoria_id: parseInt(categoria_id), 
+            unidad, 
+            es_generico,
+            es_temporada,
+            activa
+        };
+        if (stock !== '' && !isNaN(parseFloat(stock))) {
+            payload.stock = parseFloat(stock);
+        } else if (!editId) {
+            payload.stock = 0;
+        }
+
         const res = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                nombre, 
-                categoria_id: parseInt(categoria_id), 
-                unidad, 
-                stock: parseFloat(stock) || 0, 
-                es_generico,
-                es_temporada,
-                activa
-            })
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {
@@ -1497,6 +1616,8 @@ async function prepararEditarInsumo(id) {
         document.getElementById('edit-insumo-id').value = insumo.id;
         const inputNom = document.getElementById('insumo-nombre');
         if (inputNom) inputNom.value = insumo.nombre;
+        const inputStock = document.getElementById('insumo-stock');
+        if (inputStock) inputStock.value = insumo.stock !== undefined ? insumo.stock : '';
 
         const catSelect = document.getElementById('insumo-categoria');
         if (catSelect) {
@@ -1800,6 +1921,8 @@ function agregarFilaInsumoFisico(insumo_id = null, cantidad = 1) {
 function limpiarFormularioProducto() {
     document.getElementById('edit-prod-id').value = '';
     document.getElementById('prod-nombre').value = '';
+    const inputStock = document.getElementById('prod-stock');
+    if (inputStock) inputStock.value = '';
     const catProd = document.getElementById('prod-categoria');
     if (catProd) {
         catProd.value = '';
@@ -1833,6 +1956,8 @@ async function duplicarProducto(id) {
 
         const inputNombre = document.getElementById('prod-nombre');
         inputNombre.value = `Copia de ${prod.nombre}`;
+        const inputStock = document.getElementById('prod-stock');
+        if (inputStock) inputStock.value = (prod.stock !== undefined && prod.stock !== null) ? prod.stock : 0;
         const catProd = document.getElementById('prod-categoria');
         if (catProd) {
             catProd.value = prod.categoria_id || '';
@@ -1891,6 +2016,8 @@ async function prepararEditarProducto(id) {
 
         document.getElementById('edit-prod-id').value = prod.id;
         document.getElementById('prod-nombre').value = prod.nombre;
+        const inputStock = document.getElementById('prod-stock');
+        if (inputStock) inputStock.value = (prod.stock !== undefined && prod.stock !== null) ? prod.stock : 0;
 
         const checkTemp = document.getElementById('check-prod-temporada');
         if (checkTemp) checkTemp.checked = (prod.es_temporada === 1);
@@ -2030,24 +2157,37 @@ async function guardarProductoTerminado() {
     const estadoTemporada = document.getElementById('prod-temporada-estado')?.value;
     const activa = es_temporada ? parseInt(estadoTemporada || '1') : 1;
 
+    const stockInput = document.getElementById('prod-stock')?.value;
+    let stockVal = undefined;
+    if (stockInput !== '' && !isNaN(parseFloat(stockInput))) {
+        stockVal = parseFloat(stockInput);
+    } else if (!editId) {
+        stockVal = 0;
+    }
+
     const url = editId ? `/api/productos-terminados/${editId}` : '/api/productos-terminados';
     const method = editId ? 'PUT' : 'POST';
 
     try {
+        const payload = {
+            nombre,
+            categoria_id,
+            usa_receta_propia,
+            tipo_producto,
+            fases_json,
+            receta,
+            mapeo_genericos,
+            es_temporada,
+            activa
+        };
+        if (stockVal !== undefined) {
+            payload.stock = stockVal;
+        }
+
         const res = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                nombre,
-                categoria_id,
-                usa_receta_propia,
-                tipo_producto,
-                fases_json,
-                receta,
-                mapeo_genericos,
-                es_temporada,
-                activa
-            })
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {

@@ -290,7 +290,7 @@ app.post('/api/auth/cambiar-pin', (req, res) => {
 // --- API INSUMOS ---
 app.get('/api/insumos', (req, res) => {
     const categoria_id = req.query.categoria_id;
-    let query = `SELECT i.*, c.nombre as categoria, cp.nombre as categoria_padre, COALESCE(c.activa, 1) as categoria_activa, COALESCE(cp.activa, 1) as categoria_padre_activa FROM insumos i 
+    let query = `SELECT i.*, c.nombre as categoria, cp.nombre as categoria_padre, c.padre_id as categoria_padre_id, COALESCE(c.activa, 1) as categoria_activa, COALESCE(cp.activa, 1) as categoria_padre_activa FROM insumos i 
                  LEFT JOIN categorias_insumos c ON i.categoria_id = c.id 
                  LEFT JOIN categorias_insumos cp ON c.padre_id = cp.id`;
     let params = [];
@@ -328,11 +328,19 @@ app.post('/api/insumos', (req, res) => {
 
 app.put('/api/insumos/:id', (req, res) => {
     const { nombre, categoria_id, unidad, stock, es_generico, es_temporada, activa } = req.body;
-    db.run(`UPDATE insumos SET nombre = ?, categoria_id = ?, unidad = ?, stock = ?, es_generico = ?, es_temporada = ?, activa = ? WHERE id = ?`,
-        [nombre, categoria_id, unidad, stock, es_generico ? 1 : 0, es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1, req.params.id], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true });
-        });
+    let query = `UPDATE insumos SET nombre = ?, categoria_id = ?, unidad = ?, es_generico = ?, es_temporada = ?, activa = ?`;
+    let params = [nombre, categoria_id, unidad, es_generico ? 1 : 0, es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1];
+    if (stock !== undefined && stock !== '' && !isNaN(parseFloat(stock))) {
+        query += `, stock = ?`;
+        params.push(parseFloat(stock));
+    }
+    query += ` WHERE id = ?`;
+    params.push(req.params.id);
+
+    db.run(query, params, function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
 });
 
 app.patch('/api/insumos/:id/stock', (req, res) => {
@@ -372,7 +380,22 @@ app.delete('/api/insumos/:id', (req, res) => {
 
 // --- API HISTORIAL INSUMOS ---
 app.get('/api/historial-insumos', (req, res) => {
-    db.all(`SELECT h.*, COALESCE(i.nombre, 'Insumo Eliminado') as insumo_nombre, COALESCE(i.unidad, '') as unidad FROM historial_insumos h LEFT JOIN insumos i ON h.insumo_id = i.id ORDER BY h.fecha DESC LIMIT 100`, [], (err, rows) => {
+    const { limit, fecha } = req.query;
+    let query = `SELECT h.*, COALESCE(i.nombre, 'Insumo Eliminado') as insumo_nombre, COALESCE(i.unidad, '') as unidad FROM historial_insumos h LEFT JOIN insumos i ON h.insumo_id = i.id`;
+    let params = [];
+    if (fecha) {
+        query += ` WHERE h.fecha LIKE ?`;
+        params.push(`${fecha}%`);
+    }
+    query += ` ORDER BY h.id DESC`;
+    const numLimit = parseInt(limit);
+    if (!isNaN(numLimit) && numLimit > 0) {
+        query += ` LIMIT ?`;
+        params.push(numLimit);
+    } else if (limit !== 'todos') {
+        query += ` LIMIT 10`;
+    }
+    db.all(query, params, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
@@ -472,7 +495,7 @@ app.get('/api/recetas-categoria/:id', (req, res) => {
 // --- API PRODUCTOS TERMINADOS & FÓRMULAS ---
 app.get('/api/productos-terminados', (req, res) => {
     const categoria_id = req.query.categoria_id;
-    let query = `SELECT p.*, c.nombre as categoria, cp.nombre as categoria_padre, COALESCE(c.activa, 1) as categoria_activa, COALESCE(cp.activa, 1) as categoria_padre_activa FROM productos_terminados p 
+    let query = `SELECT p.*, c.nombre as categoria, cp.nombre as categoria_padre, c.padre_id as categoria_padre_id, COALESCE(c.activa, 1) as categoria_activa, COALESCE(cp.activa, 1) as categoria_padre_activa FROM productos_terminados p 
                  LEFT JOIN categorias_productos c ON p.categoria_id = c.id 
                  LEFT JOIN categorias_productos cp ON c.padre_id = cp.id`;
     let params = [];
@@ -528,11 +551,17 @@ app.patch('/api/productos-terminados/:id/fases', (req, res) => {
 });
 
 app.post('/api/productos-terminados', (req, res) => {
-    const { nombre, categoria_id, usa_receta_propia, tipo_producto, fases_json, receta, mapeo_genericos, es_temporada, activa } = req.body;
-    db.run(`INSERT INTO productos_terminados (nombre, categoria_id, stock, usa_receta_propia, tipo_producto, fases_json, es_temporada, activa) VALUES (?, ?, 0, ?, ?, ?, ?, ?)`,
-        [nombre, categoria_id, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1], async function(err) {
+    const { nombre, categoria_id, stock, usa_receta_propia, tipo_producto, fases_json, receta, mapeo_genericos, es_temporada, activa } = req.body;
+    const initialStock = (stock !== undefined && stock !== '' && !isNaN(parseFloat(stock))) ? parseFloat(stock) : 0;
+    db.run(`INSERT INTO productos_terminados (nombre, categoria_id, stock, usa_receta_propia, tipo_producto, fases_json, es_temporada, activa) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [nombre, categoria_id, initialStock, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1], async function(err) {
             if (err) return res.status(500).json({ error: err.message });
             const prodId = this.lastID;
+            if (initialStock > 0) {
+                const fechaCDMX = getFechaHoraCDMX();
+                db.run(`INSERT INTO historial_productos (producto_id, cantidad, tipo, origen, fecha) VALUES (?, ?, 'ENTRADA', 'STOCK_INICIAL', ?)`,
+                    [prodId, initialStock, fechaCDMX], () => {});
+            }
 
             if (receta && receta.length > 0) {
                 try {
@@ -566,9 +595,17 @@ app.post('/api/productos-terminados', (req, res) => {
 
 app.put('/api/productos-terminados/:id', (req, res) => {
     const prodId = req.params.id;
-    const { nombre, categoria_id, usa_receta_propia, tipo_producto, fases_json, receta, mapeo_genericos, es_temporada, activa } = req.body;
-    db.run(`UPDATE productos_terminados SET nombre = ?, categoria_id = ?, usa_receta_propia = ?, tipo_producto = ?, fases_json = ?, es_temporada = ?, activa = ? WHERE id = ?`,
-        [nombre, categoria_id, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1, prodId], async (err) => {
+    const { nombre, categoria_id, stock, usa_receta_propia, tipo_producto, fases_json, receta, mapeo_genericos, es_temporada, activa } = req.body;
+    let query = `UPDATE productos_terminados SET nombre = ?, categoria_id = ?, usa_receta_propia = ?, tipo_producto = ?, fases_json = ?, es_temporada = ?, activa = ?`;
+    let params = [nombre, categoria_id, usa_receta_propia ? 1 : 0, tipo_producto || 'estandar', typeof fases_json === 'string' ? fases_json : JSON.stringify(fases_json || []), es_temporada ? 1 : 0, activa !== undefined ? (activa ? 1 : 0) : 1];
+    if (stock !== undefined && stock !== '' && !isNaN(parseFloat(stock))) {
+        query += `, stock = ?`;
+        params.push(parseFloat(stock));
+    }
+    query += ` WHERE id = ?`;
+    params.push(prodId);
+
+    db.run(query, params, async (err) => {
             if (err) return res.status(500).json({ error: err.message });
 
             await new Promise((resolve) => db.run(`DELETE FROM recetas_productos WHERE producto_id = ?`, [prodId], () => resolve()));
@@ -640,7 +677,22 @@ app.delete('/api/productos-terminados/:id', (req, res) => {
 
 // --- API HISTORIAL PRODUCTOS TERMINADOS ---
 app.get('/api/historial-productos', (req, res) => {
-    db.all(`SELECT h.*, COALESCE(p.nombre, 'Producto Eliminado') as producto_nombre FROM historial_productos h LEFT JOIN productos_terminados p ON h.producto_id = p.id ORDER BY h.fecha DESC LIMIT 100`, [], (err, rows) => {
+    const { limit, fecha } = req.query;
+    let query = `SELECT h.*, COALESCE(p.nombre, 'Producto Eliminado') as producto_nombre FROM historial_productos h LEFT JOIN productos_terminados p ON h.producto_id = p.id`;
+    let params = [];
+    if (fecha) {
+        query += ` WHERE h.fecha LIKE ?`;
+        params.push(`${fecha}%`);
+    }
+    query += ` ORDER BY h.id DESC`;
+    const numLimit = parseInt(limit);
+    if (!isNaN(numLimit) && numLimit > 0) {
+        query += ` LIMIT ?`;
+        params.push(numLimit);
+    } else if (limit !== 'todos') {
+        query += ` LIMIT 10`;
+    }
+    db.all(query, params, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });

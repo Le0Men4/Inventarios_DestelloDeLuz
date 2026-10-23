@@ -213,17 +213,17 @@
                     
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                         <div class="relative min-w-[240px]">
-                            <input type="text" id="buscador-global-insumos" oninput="cargarInsumos()" placeholder="🔍 Buscar insumo (ej. soya, sándalo)..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:border-rose-400 focus:outline-none bg-rose-50/30">
+                            <input type="text" id="buscador-global-insumos" oninput="filtrarInsumosInstantaneo()" placeholder="🔍 Buscar insumo en vivo..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:border-rose-400 focus:outline-none bg-rose-50/30">
                         </div>
                         <div class="flex items-center gap-2 min-w-[220px]">
                             <label for="filtro-cat-insumo" class="text-xs font-bold text-rose-900 whitespace-nowrap">Categoría:</label>
-                            <select id="filtro-cat-insumo" onchange="cargarInsumos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                            <select id="filtro-cat-insumo" onchange="filtrarInsumosInstantaneo()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
                                 <option value="">Todas las categorías</option>
                             </select>
                         </div>
                         <div class="flex items-center gap-2 min-w-[200px]">
                             <label for="filtro-temporada-insumo" class="text-xs font-bold text-rose-900 whitespace-nowrap">Colección:</label>
-                            <select id="filtro-temporada-insumo" onchange="cargarInsumos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                            <select id="filtro-temporada-insumo" onchange="filtrarInsumosInstantaneo()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
                                 <option value="todos" selected>👁️ Todos los insumos</option>
                                 <option value="linea">✨ Solo de Línea</option>
                                 <option value="temporada">🍁 Solo de Temporada</option>
@@ -253,34 +253,58 @@
                 </div>
             </div>
 
-            <!-- HISTORIAL PESTAÑA 1 -->
-            <div class="bg-white p-5 sm:p-7 rounded-3xl shadow-sm border-2 border-rose-100 space-y-4">
-                <div class="flex justify-between items-center border-b border-rose-100 pb-3">
-                    <div>
-                        <h3 class="text-lg sm:text-xl font-black text-rose-950 flex items-center gap-2">
-                            <span>📜</span> Historial Reciente de Movimientos en Taller
-                        </h3>
-                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Registro de entradas manuales y consumos de producción. Cada registro permanece guardado permanentemente a menos que decidas eliminarlo manualmente.</p>
+            <!-- HISTORIAL PESTAÑA 1 (DESPLEGABLE / COLAPSABLE) -->
+            <div class="bg-white rounded-3xl shadow-sm border-2 border-rose-100 overflow-hidden transition-all">
+                <button type="button" onclick="toggleHistorialDesplegable('insumos')" class="w-full p-4 sm:p-5 flex items-center justify-between bg-rose-50/60 hover:bg-rose-100/70 transition text-left cursor-pointer">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl sm:text-2xl">📜</span>
+                        <div>
+                            <h3 class="text-base sm:text-lg font-black text-rose-950 flex items-center gap-2">
+                                Historial de Movimientos de Insumos
+                                <span id="badge-contador-historial-insumos" class="text-xs bg-rose-200/80 text-rose-800 px-2 py-0.5 rounded-full font-bold">10 movimientos</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 font-medium">Clic aquí para desplegar o contraer el registro de entradas y consumos.</p>
+                        </div>
                     </div>
-                    <button onclick="cargarHistorialInsumos()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl border border-rose-200 transition">
-                        🔄 Refrescar Historial
-                    </button>
-                </div>
-                
-                <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
-                                <th class="p-3.5">Fecha</th>
-                                <th class="p-3.5">Insumo</th>
-                                <th class="p-3.5">Tipo Movimiento</th>
-                                <th class="p-3.5">Cantidad</th>
-                                <th class="p-3.5">Origen / Detalle</th>
-                                <th class="p-3.5 text-center">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-historial-insumos" class="divide-y divide-rose-100"></tbody>
-                    </table>
+                    <div class="flex items-center gap-2">
+                        <span id="icono-flecha-historial-insumos" class="text-rose-700 font-black text-xs bg-white px-3 py-1.5 rounded-xl border border-rose-200 shadow-2xs">▼ Ver Historial</span>
+                    </div>
+                </button>
+
+                <div id="contenedor-desplegable-historial-insumos" class="hidden p-5 sm:p-6 border-t-2 border-rose-100 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-rose-50/50 p-3 rounded-2xl border border-rose-200">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs font-bold text-rose-900">Mostrar:</span>
+                            <select id="limite-historial-insumos" onchange="cargarHistorialInsumos()" class="border-2 border-rose-200 p-2 rounded-xl text-xs font-black text-rose-950 bg-white focus:outline-none focus:ring-2 focus:ring-rose-400">
+                                <option value="10" selected>Últimos 10 movimientos (Rápido)</option>
+                                <option value="25">Últimos 25 movimientos</option>
+                                <option value="50">Últimos 50 movimientos</option>
+                                <option value="todos">Todos los movimientos</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs font-bold text-rose-900">Por fecha:</span>
+                            <input type="date" id="filtro-fecha-historial-insumos" onchange="cargarHistorialInsumos()" class="border-2 border-rose-200 p-1.5 rounded-xl text-xs font-bold text-rose-950 bg-white focus:outline-none focus:ring-2 focus:ring-rose-400">
+                            <button type="button" onclick="document.getElementById('filtro-fecha-historial-insumos').value = ''; cargarHistorialInsumos();" class="text-xs text-rose-600 hover:text-rose-800 font-bold px-2 py-1 bg-white rounded-lg border border-rose-200" title="Limpiar fecha">✕ Quitar</button>
+                            <button type="button" onclick="cargarHistorialInsumos()" class="text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl shadow-xs transition">🔄 Refrescar</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
+                                    <th class="p-3.5">Fecha</th>
+                                    <th class="p-3.5">Insumo</th>
+                                    <th class="p-3.5">Tipo Movimiento</th>
+                                    <th class="p-3.5">Cantidad</th>
+                                    <th class="p-3.5">Origen / Detalle</th>
+                                    <th class="p-3.5 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-historial-insumos" class="divide-y divide-rose-100"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -398,17 +422,17 @@
                     </div>
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                         <div class="relative min-w-[220px]">
-                            <input type="text" id="buscador-global-productos" oninput="cargarProductos()" placeholder="🔍 Buscar producto..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/30">
+                            <input type="text" id="buscador-global-productos" oninput="filtrarProductosInstantaneo()" placeholder="🔍 Buscar producto en vivo..." class="w-full border-2 border-rose-200 p-2.5 pl-3.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/30">
                         </div>
                         <div class="flex items-center gap-2 min-w-[200px]">
                             <label for="filtro-cat-prod" class="text-xs font-bold text-rose-900 whitespace-nowrap">Categoría:</label>
-                            <select id="filtro-cat-prod" onchange="cargarProductos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                            <select id="filtro-cat-prod" onchange="filtrarProductosInstantaneo()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
                                 <option value="">Todas las categorías</option>
                             </select>
                         </div>
                         <div class="flex items-center gap-2 min-w-[200px]">
                             <label for="filtro-temporada-prod" class="text-xs font-bold text-rose-900 whitespace-nowrap">Colección:</label>
-                            <select id="filtro-temporada-prod" onchange="cargarProductos()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
+                            <select id="filtro-temporada-prod" onchange="filtrarProductosInstantaneo()" class="w-full border-2 border-rose-200 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-white">
                                 <option value="todos" selected>👁️ Todos los productos</option>
                                 <option value="linea">✨ Solo de Línea</option>
                                 <option value="temporada">🍁 Solo de Temporada</option>
@@ -437,34 +461,58 @@
                 </div>
             </div>
 
-            <!-- HISTORIAL PESTAÑA 2 -->
-            <div class="bg-white p-5 sm:p-7 rounded-3xl shadow-sm border-2 border-rose-100 space-y-4">
-                <div class="flex justify-between items-center border-b border-rose-100 pb-3">
-                    <div>
-                        <h3 class="text-lg sm:text-xl font-black text-rose-950 flex items-center gap-2">
-                            <span>📜</span> Historial Reciente de Entradas en Producto Terminado
-                        </h3>
-                        <p class="text-xs sm:text-sm text-slate-500 font-medium">Registro de entradas manuales vs jornadas de fabricación con responsable. Cada registro permanece guardado permanentemente a menos que decidas eliminarlo manualmente.</p>
+            <!-- HISTORIAL PESTAÑA 2 (DESPLEGABLE / COLAPSABLE) -->
+            <div class="bg-white rounded-3xl shadow-sm border-2 border-rose-100 overflow-hidden transition-all">
+                <button type="button" onclick="toggleHistorialDesplegable('productos')" class="w-full p-4 sm:p-5 flex items-center justify-between bg-rose-50/60 hover:bg-rose-100/70 transition text-left cursor-pointer">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl sm:text-2xl">📜</span>
+                        <div>
+                            <h3 class="text-base sm:text-lg font-black text-rose-950 flex items-center gap-2">
+                                Historial de Entradas en Producto Terminado
+                                <span id="badge-contador-historial-productos" class="text-xs bg-rose-200/80 text-rose-800 px-2 py-0.5 rounded-full font-bold">10 movimientos</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 font-medium">Clic aquí para desplegar o contraer el registro de fabricación y entradas manuales.</p>
+                        </div>
                     </div>
-                    <button onclick="cargarHistorialProductos()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3.5 py-2 rounded-xl border border-rose-200 transition">
-                        🔄 Refrescar Historial
-                    </button>
-                </div>
-                
-                <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
-                                <th class="p-3.5">Fecha</th>
-                                <th class="p-3.5">Producto Fabricado</th>
-                                <th class="p-3.5">Tipo</th>
-                                <th class="p-3.5">Cantidad</th>
-                                <th class="p-3.5">Origen & Responsable</th>
-                                <th class="p-3.5 text-center">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-historial-productos" class="divide-y divide-rose-100"></tbody>
-                    </table>
+                    <div class="flex items-center gap-2">
+                        <span id="icono-flecha-historial-productos" class="text-rose-700 font-black text-xs bg-white px-3 py-1.5 rounded-xl border border-rose-200 shadow-2xs">▼ Ver Historial</span>
+                    </div>
+                </button>
+
+                <div id="contenedor-desplegable-historial-productos" class="hidden p-5 sm:p-6 border-t-2 border-rose-100 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-rose-50/50 p-3 rounded-2xl border border-rose-200">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs font-bold text-rose-900">Mostrar:</span>
+                            <select id="limite-historial-productos" onchange="cargarHistorialProductos()" class="border-2 border-rose-200 p-2 rounded-xl text-xs font-black text-rose-950 bg-white focus:outline-none focus:ring-2 focus:ring-rose-400">
+                                <option value="10" selected>Últimos 10 movimientos (Rápido)</option>
+                                <option value="25">Últimos 25 movimientos</option>
+                                <option value="50">Últimos 50 movimientos</option>
+                                <option value="todos">Todos los movimientos</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs font-bold text-rose-900">Por fecha:</span>
+                            <input type="date" id="filtro-fecha-historial-productos" onchange="cargarHistorialProductos()" class="border-2 border-rose-200 p-1.5 rounded-xl text-xs font-bold text-rose-950 bg-white focus:outline-none focus:ring-2 focus:ring-rose-400">
+                            <button type="button" onclick="document.getElementById('filtro-fecha-historial-productos').value = ''; cargarHistorialProductos();" class="text-xs text-rose-600 hover:text-rose-800 font-bold px-2 py-1 bg-white rounded-lg border border-rose-200" title="Limpiar fecha">✕ Quitar</button>
+                            <button type="button" onclick="cargarHistorialProductos()" class="text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl shadow-xs transition">🔄 Refrescar</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-2xl border-2 border-rose-100">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-rose-100/70 text-rose-950 font-black border-b border-rose-200 text-xs uppercase tracking-wider">
+                                    <th class="p-3.5">Fecha</th>
+                                    <th class="p-3.5">Producto Fabricado</th>
+                                    <th class="p-3.5">Tipo</th>
+                                    <th class="p-3.5">Cantidad</th>
+                                    <th class="p-3.5">Origen & Responsable</th>
+                                    <th class="p-3.5 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-historial-productos" class="divide-y divide-rose-100"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -505,10 +553,16 @@
 
                     <input type="hidden" id="edit-prod-id">
 
-                    <!-- Nombre del producto -->
-                    <div>
-                        <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Nombre del Producto:</label>
-                        <input type="text" id="prod-nombre" placeholder="Ej. Vela Postre Fresa / Spray Textil Vainilla / Aromatizante Lavanda" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                    <!-- Nombre y Stock del producto -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Nombre del Producto:</label>
+                            <input type="text" id="prod-nombre" placeholder="Ej. Vela Postre Fresa / Spray Textil Vainilla / Aromatizante Lavanda" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-rose-900 uppercase tracking-wider mb-1">Stock Actual (Piezas):</label>
+                            <input type="number" id="prod-stock" placeholder="0" min="0" step="1" class="w-full border-2 border-rose-200 p-3 rounded-xl text-sm font-bold text-rose-900 focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20">
+                        </div>
                     </div>
 
                     <!-- Categoría del producto -->
