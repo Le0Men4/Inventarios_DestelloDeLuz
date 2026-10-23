@@ -36,8 +36,8 @@ function formatearFechaCDMX(fechaOriginal) {
 async function refrescarTodoElProyecto() {
     try {
         await cargarCategorias();
-        await cargarInsumos();
-        await cargarProductos();
+        await cargarInsumos(true);
+        await cargarProductos(true);
         await cargarRecetasYMapeos();
         await cargarFichasTecnicas();
         await cargarOperadores();
@@ -400,8 +400,8 @@ function filtrarOpcionesSelect(inputElem) {
 
 document.addEventListener("DOMContentLoaded", async () => {
     await cargarCategorias();
-    await cargarInsumos();
-    await cargarProductos();
+    await cargarInsumos(true);
+    await cargarProductos(true);
     await cargarRecetasYMapeos();
     await cargarFichasTecnicas();
     await cargarOperadores();
@@ -483,10 +483,10 @@ function cambiarPestana(pestana) {
 
     if (pestana === 'taller') {
         cargarInsumos();
-        cargarHistorialInsumos();
+        if (typeof historialInsumosAbierto !== 'undefined' && historialInsumosAbierto) cargarHistorialInsumos();
     } else if (pestana === 'terminado') {
         cargarProductos();
-        cargarHistorialProductos();
+        if (typeof historialProductosAbierto !== 'undefined' && historialProductosAbierto) cargarHistorialProductos();
     } else if (pestana === 'produccion') {
         cargarOperadores();
         cargarHistorialProduccion();
@@ -728,8 +728,8 @@ async function eliminarLoteProduccion(id) {
     const data = await res.json();
     if (res.ok) {
         alert(data.message || "Producción revertida: se restaron las velas terminadas y se devolvieron los insumos al taller.");
-        await cargarInsumos();
-        await cargarProductos();
+        await cargarInsumos(true);
+        await cargarProductos(true);
         await cargarHistoriales();
     } else {
         alert("Error al revertir la producción: " + (data.error || "Error desconocido"));
@@ -995,18 +995,14 @@ function filtrarCategoríasRegistradas(tipo) {
     renderizarArbolCategorias(tipo);
 }
 
-async function cargarInsumos() {
+async function cargarInsumos(forzarFetch = false) {
     try {
-        const filtroCat = document.getElementById('filtro-cat-insumo')?.value || '';
-        const buscarTexto = normalizarTexto(document.getElementById('buscador-global-insumos')?.value || '');
-        const filtroTemporada = document.getElementById('filtro-temporada-insumo')?.value || 'todos';
-        
-        let url = '/api/insumos';
-        if (filtroCat) {
-            url = `/api/insumos?categoria_id=${filtroCat}`;
+        if (!forzarFetch && insumosLista && insumosLista.length > 0) {
+            filtrarInsumosInstantaneo();
+            return;
         }
-        
-        const res = await fetch(url);
+
+        const res = await fetch('/api/insumos');
         insumosLista = await res.json();
         
         if (insumosLista.length === 0) {
@@ -1018,140 +1014,150 @@ async function cargarInsumos() {
             }
         }
 
-        let listaMostrar = insumosLista;
-        if (buscarTexto) {
-            listaMostrar = insumosLista.filter(i => {
-                const nombre = normalizarTexto(i.nombre);
-                const cat = normalizarTexto(i.categoria || '');
-                const padre = normalizarTexto(i.categoria_padre || '');
-                return nombre.includes(buscarTexto) || cat.includes(buscarTexto) || padre.includes(buscarTexto);
-            });
-        }
-
-        // Filtro estricto de Colección / Temporada / Alerta de Stock para Insumos
-        if (filtroTemporada === 'stock_bajo') {
-            // ALERTA DE STOCK: filtra solo insumos con stock menor o igual al mínimo configurado
-            listaMostrar = listaMostrar.filter(i => {
-                const minStockVal = parseFloat(localStorage.getItem(`min_stock_insumo_${i.id}`) || '5');
-                return i.stock <= minStockVal;
-            });
-        } else if (filtroTemporada === 'linea') {
-            listaMostrar = listaMostrar.filter(i => i.es_temporada !== 1 && i.activa !== 0 && i.categoria_activa !== 0 && i.categoria_padre_activa !== 0);
-        } else if (filtroTemporada === 'temporada') {
-            listaMostrar = listaMostrar.filter(i => i.es_temporada === 1 && i.activa !== 0 && i.categoria_activa !== 0 && i.categoria_padre_activa !== 0);
-        } else if (filtroTemporada === 'pausados') {
-            listaMostrar = listaMostrar.filter(i => (i.activa === 0) || (i.categoria_activa === 0) || (i.categoria_padre_activa === 0));
-        } else {
-            // 'todos': no se muestran pausados
-            listaMostrar = listaMostrar.filter(i => (i.activa !== 0) && (i.categoria_activa !== 0) && (i.categoria_padre_activa !== 0));
-        }
-
-        const tabla = document.getElementById('tabla-insumos');
-        if (!tabla) return;
-        tabla.innerHTML = '';
-
-        if (listaMostrar.length === 0) {
-            tabla.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">No hay insumos que coincidan con la selección.</td></tr>`;
-            return;
-        }
-
-        listaMostrar.forEach(i => {
-            const catNombre = i.categoria_padre ? `${i.categoria_padre} ➔ ${i.categoria}` : (i.categoria || 'Sin categoría');
-            const tipoInsumo = i.es_generico === 1 
-                ? `<span class="bg-rose-100 text-rose-900 border border-rose-200 px-2.5 py-1 rounded-xl text-xs font-black">Genérico / Plantilla</span>` 
-                : `<span class="text-rose-900/70 text-xs font-bold">Aroma / Específico</span>`;
-
-            const minStockKey = `min_stock_insumo_${i.id}`;
-            const minStockVal = parseFloat(localStorage.getItem(minStockKey) || '5');
-            const esStockBajo = i.stock <= minStockVal;
-
-            const stockBadge = esStockBajo
-                ? `<span class="bg-red-100 text-red-700 border-2 border-red-300 px-3 py-1 rounded-xl text-sm sm:text-base font-black flex items-center gap-1 inline-flex shadow-xs" title="¡Stock bajo!">⚠️ ${i.stock}</span>`
-                : `<span class="text-base sm:text-lg font-black text-rose-950">${i.stock}</span>`;
-
-            // Columna de Colección / Temporada para Insumo
-            let colTemporada = '';
-            const estaPausado = (i.activa === 0) || (i.categoria_activa === 0) || (i.categoria_padre_activa === 0);
-
-            if (i.es_temporada === 1) {
-                if (estaPausado) {
-                    colTemporada = `
-                        <button type="button" onclick="alternarTemporadaInsumo(${i.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200 transition shadow-2xs cursor-pointer" title="Insumo de temporada pausado. Clic para reactivar.">
-                            ❄️ Pausado
-                        </button>
-                    `;
-                } else {
-                    colTemporada = `
-                        <button type="button" onclick="alternarTemporadaInsumo(${i.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition shadow-2xs cursor-pointer" title="Insumo de temporada activo. Clic para pausar.">
-                            🍁 Temporada
-                        </button>
-                    `;
-                }
-            } else {
-                colTemporada = `<span class="text-xs font-semibold text-slate-400 select-none">De línea</span>`;
-            }
-
-            tabla.innerHTML += `
-                <tr class="hover:bg-rose-50/40 transition border-b border-rose-100 ${esStockBajo ? 'bg-red-50/50' : ''}">
-                    <td class="p-3.5 font-black text-rose-950 text-sm sm:text-base">${i.nombre}</td>
-                    <td class="p-3.5 text-rose-800 text-xs sm:text-sm font-semibold">${catNombre}</td>
-                    <td class="p-3.5">${tipoInsumo}</td>
-                    <td class="p-3.5">
-                        <div class="flex items-center gap-2">
-                            ${stockBadge}
-                            <button onclick="cambiarMinimoStockInsumo(${i.id}, ${minStockVal})" class="text-[11px] text-rose-400 hover:text-rose-600 font-bold underline" title="Ajustar mínimo">Mín: ${minStockVal}</button>
-                        </div>
-                    </td>
-                    <td class="p-3.5 text-rose-900 font-bold text-xs uppercase">${i.unidad}</td>
-                    <td class="p-3.5 text-center whitespace-nowrap">
-                        ${colTemporada}
-                    </td>
-                    <td class="p-3.5 text-center">
-                        <div class="inline-flex items-center gap-1.5 bg-rose-50/60 p-1 rounded-2xl border border-rose-200">
-                            <input type="number" step="0.01" id="sumar-stock-insumo-${i.id}" placeholder="Cant." class="w-20 border-2 border-rose-200 p-1.5 rounded-xl text-xs sm:text-sm text-center font-black text-rose-950 bg-white focus:outline-none focus:border-rose-400">
-                            <button onclick="ajustarStockInsumo(${i.id}, 1)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Agregar">+ Entrada</button>
-                            <button onclick="ajustarStockInsumo(${i.id}, -1)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Restar">- Restar</button>
-                        </div>
-                    </td>
-                    <td class="p-3.5 text-center whitespace-nowrap">
-                        <button onclick="prepararEditarInsumo(${i.id})" class="bg-rose-100 text-rose-800 hover:bg-rose-200 px-3 py-1.5 rounded-xl text-xs font-black mr-1 transition border border-rose-300">✏️ Editar</button>
-                        <button onclick="eliminarInsumo(${i.id}, '${i.nombre}')" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-xl text-xs font-black transition border border-red-200">✕</button>
-                    </td>
-                </tr>
-            `;
-        });
-        renderizarArbolCategorias('insumo');
+        filtrarInsumosInstantaneo();
     } catch (e) {
         console.error("Error cargando insumos:", e);
     }
+}
+
+function filtrarInsumosInstantaneo() {
+    const filtroCat = document.getElementById('filtro-cat-insumo')?.value || '';
+    const buscarTexto = normalizarTexto(document.getElementById('buscador-global-insumos')?.value || '');
+    const filtroTemporada = document.getElementById('filtro-temporada-insumo')?.value || 'todos';
+
+    let listaMostrar = insumosLista || [];
+
+    if (filtroCat) {
+        listaMostrar = listaMostrar.filter(i => String(i.categoria_id) === String(filtroCat) || String(i.categoria_padre_id) === String(filtroCat));
+    }
+
+    if (buscarTexto) {
+        listaMostrar = listaMostrar.filter(i => {
+            const nombre = normalizarTexto(i.nombre);
+            const cat = normalizarTexto(i.categoria || '');
+            const padre = normalizarTexto(i.categoria_padre || '');
+            return nombre.includes(buscarTexto) || cat.includes(buscarTexto) || padre.includes(buscarTexto);
+        });
+    }
+
+    if (filtroTemporada === 'stock_bajo') {
+        listaMostrar = listaMostrar.filter(i => {
+            const minStockVal = parseFloat(localStorage.getItem(`min_stock_insumo_${i.id}`) || '5');
+            return i.stock <= minStockVal;
+        });
+    } else if (filtroTemporada === 'linea') {
+        listaMostrar = listaMostrar.filter(i => i.es_temporada !== 1 && i.activa !== 0 && i.categoria_activa !== 0 && i.categoria_padre_activa !== 0);
+    } else if (filtroTemporada === 'temporada') {
+        listaMostrar = listaMostrar.filter(i => i.es_temporada === 1 && i.activa !== 0 && i.categoria_activa !== 0 && i.categoria_padre_activa !== 0);
+    } else if (filtroTemporada === 'pausados') {
+        listaMostrar = listaMostrar.filter(i => (i.activa === 0) || (i.categoria_activa === 0) || (i.categoria_padre_activa === 0));
+    } else {
+        listaMostrar = listaMostrar.filter(i => (i.activa !== 0) && (i.categoria_activa !== 0) && (i.categoria_padre_activa !== 0));
+    }
+
+    renderizarTablaInsumos(listaMostrar);
+    renderizarArbolCategorias('insumo');
+}
+
+function renderizarTablaInsumos(listaMostrar) {
+    const tabla = document.getElementById('tabla-insumos');
+    if (!tabla) return;
+
+    if (!listaMostrar || listaMostrar.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-gray-400">No hay insumos que coincidan con la selección.</td></tr>';
+        return;
+    }
+
+    const filas = listaMostrar.map(i => {
+        const catNombre = i.categoria_padre ? `${i.categoria_padre} ➔ ${i.categoria}` : (i.categoria || 'Sin categoría');
+        const tipoInsumo = i.es_generico === 1 
+            ? '<span class="bg-rose-100 text-rose-900 border border-rose-200 px-2.5 py-1 rounded-xl text-xs font-black">Genérico / Plantilla</span>' 
+            : '<span class="text-rose-900/70 text-xs font-bold">Aroma / Específico</span>';
+
+        const minStockKey = `min_stock_insumo_${i.id}`;
+        const minStockVal = parseFloat(localStorage.getItem(minStockKey) || '5');
+        const esStockBajo = i.stock <= minStockVal;
+
+        const stockBadge = esStockBajo
+            ? `<span id="stock-badge-insumo-${i.id}" class="bg-red-100 text-red-700 border-2 border-red-300 px-3 py-1 rounded-xl text-sm sm:text-base font-black flex items-center gap-1 inline-flex shadow-xs" title="¡Stock bajo!">⚠️ ${i.stock}</span>`
+            : `<span id="stock-badge-insumo-${i.id}" class="text-base sm:text-lg font-black text-rose-950">${i.stock}</span>`;
+
+        let colTemporada = '';
+        const estaPausado = (i.activa === 0) || (i.categoria_activa === 0) || (i.categoria_padre_activa === 0);
+
+        if (i.es_temporada === 1) {
+            if (estaPausado) {
+                colTemporada = `
+                    <button type="button" onclick="alternarTemporadaInsumo(${i.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200 transition shadow-2xs cursor-pointer" title="Insumo de temporada pausado. Clic para reactivar.">
+                        ❄️ Pausado
+                    </button>
+                `;
+            } else {
+                colTemporada = `
+                    <button type="button" onclick="alternarTemporadaInsumo(${i.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition shadow-2xs cursor-pointer" title="Insumo de temporada activo. Clic para pausar.">
+                        🍁 Temporada
+                    </button>
+                `;
+            }
+        } else {
+            colTemporada = '<span class="text-xs font-semibold text-slate-400 select-none">De línea</span>';
+        }
+
+        return `
+            <tr class="hover:bg-rose-50/40 transition border-b border-rose-100 ${esStockBajo ? 'bg-red-50/50' : ''}">
+                <td class="p-3.5 font-black text-rose-950 text-sm sm:text-base">${i.nombre}</td>
+                <td class="p-3.5 text-rose-800 text-xs sm:text-sm font-semibold">${catNombre}</td>
+                <td class="p-3.5">${tipoInsumo}</td>
+                <td class="p-3.5">
+                    <div class="flex items-center gap-2">
+                        ${stockBadge}
+                        <button onclick="cambiarMinimoStockInsumo(${i.id}, ${minStockVal})" class="text-[11px] text-rose-400 hover:text-rose-600 font-bold underline" title="Ajustar mínimo">Mín: ${minStockVal}</button>
+                    </div>
+                </td>
+                <td class="p-3.5 text-rose-900 font-bold text-xs uppercase">${i.unidad}</td>
+                <td class="p-3.5 text-center whitespace-nowrap">
+                    ${colTemporada}
+                </td>
+                <td class="p-3.5 text-center">
+                    <div class="inline-flex items-center gap-1.5 bg-rose-50/60 p-1 rounded-2xl border border-rose-200">
+                        <input type="number" step="0.01" id="sumar-stock-insumo-${i.id}" placeholder="Cant." class="w-20 border-2 border-rose-200 p-1.5 rounded-xl text-xs sm:text-sm text-center font-black text-rose-950 bg-white focus:outline-none focus:border-rose-400">
+                        <button onclick="ajustarStockInsumo(${i.id}, 1, this)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Agregar">+ Entrada</button>
+                        <button onclick="ajustarStockInsumo(${i.id}, -1, this)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Restar">- Restar</button>
+                    </div>
+                </td>
+                <td class="p-3.5 text-center whitespace-nowrap">
+                    <button onclick="prepararEditarInsumo(${i.id})" class="bg-rose-100 text-rose-800 hover:bg-rose-200 px-3 py-1.5 rounded-xl text-xs font-black mr-1 transition border border-rose-300">✏️ Editar</button>
+                    <button onclick="eliminarInsumo(${i.id}, '${i.nombre}')" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-xl text-xs font-black transition border border-red-200">✕</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tabla.innerHTML = filas.join('');
 }
 
 function cambiarMinimoStockInsumo(id, actual) {
     const nuevo = prompt("Define la cantidad mínima de stock para la alerta en rojo:", actual);
     if (nuevo === null || isNaN(parseFloat(nuevo))) return;
     localStorage.setItem(`min_stock_insumo_${id}`, parseFloat(nuevo));
-    cargarInsumos();
+    filtrarInsumosInstantaneo();
 }
 
 function cambiarMinimoStockProd(id, actual) {
     const nuevo = prompt("Define la cantidad mínima de piezas para la alerta en rojo:", actual);
     if (nuevo === null || isNaN(parseFloat(nuevo))) return;
     localStorage.setItem(`min_stock_prod_${id}`, parseFloat(nuevo));
-    cargarProductos();
+    filtrarProductosInstantaneo();
 }
 
-async function cargarProductos() {
+async function cargarProductos(forzarFetch = false) {
     try {
-        const filtroCat = document.getElementById('filtro-cat-prod')?.value || '';
-        const buscarTexto = normalizarTexto(document.getElementById('buscador-global-productos')?.value || '');
-        const filtroTemporada = document.getElementById('filtro-temporada-prod')?.value || 'todos';
-
-        let url = '/api/productos-terminados';
-        if (filtroCat) {
-            url = `/api/productos-terminados?categoria_id=${filtroCat}`;
+        if (!forzarFetch && productosLista && productosLista.length > 0) {
+            filtrarProductosInstantaneo();
+            return;
         }
 
-        const res = await fetch(url);
+        const res = await fetch('/api/productos-terminados');
         productosLista = await res.json();
         
         if (productosLista.length === 0) {
@@ -1177,136 +1183,151 @@ async function cargarProductos() {
             }
         }
 
-        let listaMostrar = productosLista;
-        if (buscarTexto) {
-            listaMostrar = productosLista.filter(p => {
-                const nombre = normalizarTexto(p.nombre);
-                const cat = normalizarTexto(p.categoria || '');
-                const padre = normalizarTexto(p.categoria_padre || '');
-                return nombre.includes(buscarTexto) || cat.includes(buscarTexto) || padre.includes(buscarTexto);
-            });
-        }
-
-        // Filtro estricto de Colección / Temporada / Alerta de Stock para Productos
-        if (filtroTemporada === 'stock_bajo') {
-            // ALERTA DE STOCK: filtra solo productos terminados con stock menor o igual al mínimo configurado
-            listaMostrar = listaMostrar.filter(p => {
-                const minStockVal = parseFloat(localStorage.getItem(`min_stock_prod_${p.id}`) || '3');
-                return p.stock <= minStockVal;
-            });
-        } else if (filtroTemporada === 'linea') {
-            listaMostrar = listaMostrar.filter(p => p.es_temporada !== 1 && p.activa !== 0 && p.categoria_activa !== 0 && p.categoria_padre_activa !== 0);
-        } else if (filtroTemporada === 'temporada') {
-            listaMostrar = listaMostrar.filter(p => p.es_temporada === 1 && p.activa !== 0 && p.categoria_activa !== 0 && p.categoria_padre_activa !== 0);
-        } else if (filtroTemporada === 'pausados') {
-            listaMostrar = listaMostrar.filter(p => (p.activa === 0) || (p.categoria_activa === 0) || (p.categoria_padre_activa === 0));
-        } else {
-            listaMostrar = listaMostrar.filter(p => (p.activa !== 0) && (p.categoria_activa !== 0) && (p.categoria_padre_activa !== 0));
-        }
-
-        const tabla = document.getElementById('tabla-productos');
-        if (!tabla) return;
-        tabla.innerHTML = '';
-
-        poblarSelectorProductosFicha();
-
-        if (listaMostrar.length === 0) {
-            tabla.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay productos que coincidan con la búsqueda.</td></tr>`;
-            return;
-        }
-
-        listaMostrar.forEach(p => {
-            const catNombre = p.categoria_padre ? `${p.categoria_padre} ➔ ${p.categoria}` : (p.categoria || 'Sin categoría');
-            
-            let fases = [];
-            try {
-                fases = typeof p.fases_json === 'string' ? JSON.parse(p.fases_json) : (p.fases_json || []);
-            } catch(e) {
-                fases = [];
-            }
-
-            let tipoReceta = '';
-            if (p.tipo_producto === 'postre' || (Array.isArray(fases) && fases.length > 0)) {
-                const resumenFases = fases.map(f => `${f.nombre} (${f.color || 'Sin color'})`).join(' + ');
-                tipoReceta = `
-                    <div>
-                        <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-bold inline-flex items-center gap-1">
-                            🧁 Postre (${fases.length} fases)
-                        </span>
-                        <div class="text-[11px] text-gray-500 mt-0.5 max-w-[200px] truncate" title="${resumenFases}">
-                            ${resumenFases || 'Fases configuradas'}
-                        </div>
-                    </div>
-                `;
-            } else if (p.usa_receta_propia === 1) {
-                tipoReceta = `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold">🕯️ Especial propia</span>`;
-            } else {
-                tipoReceta = `<span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold">📁 Fórmula Categoría</span>`;
-            }
-
-            const minStockKey = `min_stock_prod_${p.id}`;
-            const minStockVal = parseFloat(localStorage.getItem(minStockKey) || '3');
-            const esStockBajo = p.stock <= minStockVal;
-
-            const stockBadge = esStockBajo
-                ? `<span class="bg-red-100 text-red-700 border-2 border-red-300 px-3 py-1 rounded-xl text-sm sm:text-base font-black flex items-center gap-1 inline-flex shadow-xs" title="¡Inventario bajo!">⚠️ ${p.stock} pzas</span>`
-                : `<span class="text-base sm:text-lg font-black text-rose-950">${p.stock} pzas</span>`;
-
-            // Columna de Colección / Temporada
-            let colTemporada = '';
-            const estaPausado = (p.activa === 0) || (p.categoria_activa === 0) || (p.categoria_padre_activa === 0);
-
-            if (p.es_temporada === 1) {
-                if (estaPausado) {
-                    colTemporada = `
-                        <button type="button" onclick="alternarTemporadaProducto(${p.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200 transition shadow-2xs cursor-pointer" title="Producto de temporada pausado. Clic para reactivar.">
-                            ❄️ Pausado
-                        </button>
-                    `;
-                } else {
-                    colTemporada = `
-                        <button type="button" onclick="alternarTemporadaProducto(${p.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition shadow-2xs cursor-pointer" title="Producto de temporada activo. Clic para pausar.">
-                            🍁 Temporada
-                        </button>
-                    `;
-                }
-            } else {
-                colTemporada = `<span class="text-xs font-semibold text-slate-400 select-none">De línea</span>`;
-            }
-
-            tabla.innerHTML += `
-                <tr class="hover:bg-rose-50/40 transition border-b border-rose-100 ${esStockBajo ? 'bg-red-50/50' : ''}">
-                    <td class="p-3.5 font-black text-rose-950 text-sm sm:text-base">${p.nombre}</td>
-                    <td class="p-3.5 text-rose-800 text-xs sm:text-sm font-semibold">${catNombre}</td>
-                    <td class="p-3.5">${tipoReceta}</td>
-                    <td class="p-3.5">
-                        <div class="flex items-center gap-2">
-                            ${stockBadge}
-                            <button onclick="cambiarMinimoStockProd(${p.id}, ${minStockVal})" class="text-[11px] text-rose-400 hover:text-rose-600 font-bold underline" title="Ajustar mínimo">Mín: ${minStockVal}</button>
-                        </div>
-                    </td>
-                    <td class="p-3.5 text-center whitespace-nowrap">
-                        ${colTemporada}
-                    </td>
-                    <td class="p-3.5 text-center">
-                        <div class="inline-flex items-center gap-1.5 bg-rose-50/60 p-1 rounded-2xl border border-rose-200">
-                            <input type="number" step="1" id="sumar-stock-prod-${p.id}" placeholder="Cant." class="w-20 border-2 border-rose-200 p-1.5 rounded-xl text-xs sm:text-sm text-center font-black text-rose-950 bg-white focus:outline-none focus:border-rose-400">
-                            <button onclick="ajustarStockProducto(${p.id}, 1)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Agregar stock">+ Entrada</button>
-                            <button onclick="ajustarStockProducto(${p.id}, -1)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Restar stock">- Restar</button>
-                        </div>
-                    </td>
-                    <td class="p-3.5 text-center whitespace-nowrap">
-                        <button onclick="duplicarProducto(${p.id})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1.5 rounded-xl text-xs font-black mr-1 transition shadow-xs active:scale-95" title="Clonar esta vela con 1 clic para crear una variante en segundos con otro aroma o color">📋 Duplicar</button>
-                        <button onclick="prepararEditarProducto(${p.id})" class="bg-rose-100 text-rose-800 hover:bg-rose-200 px-3 py-1.5 rounded-xl text-xs font-black mr-1 transition border border-rose-300">✏️ Editar</button>
-                        <button onclick="eliminarProducto(${p.id}, '${p.nombre}')" class="bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-xl text-xs font-black transition border border-red-200">✕</button>
-                    </td>
-                </tr>
-            `;
-        });
-        renderizarArbolCategorias('prod');
+        filtrarProductosInstantaneo();
     } catch (e) {
         console.error("Error cargando productos:", e);
     }
+}
+
+function filtrarProductosInstantaneo() {
+    const filtroCat = document.getElementById('filtro-cat-prod')?.value || '';
+    const buscarTexto = normalizarTexto(document.getElementById('buscador-global-productos')?.value || '');
+    const filtroTemporada = document.getElementById('filtro-temporada-prod')?.value || 'todos';
+
+    let listaMostrar = productosLista || [];
+
+    if (filtroCat) {
+        listaMostrar = listaMostrar.filter(p => String(p.categoria_id) === String(filtroCat) || String(p.categoria_padre_id) === String(filtroCat));
+    }
+
+    if (buscarTexto) {
+        listaMostrar = listaMostrar.filter(p => {
+            const nombre = normalizarTexto(p.nombre);
+            const cat = normalizarTexto(p.categoria || '');
+            const padre = normalizarTexto(p.categoria_padre || '');
+            return nombre.includes(buscarTexto) || cat.includes(buscarTexto) || padre.includes(buscarTexto);
+        });
+    }
+
+    if (filtroTemporada === 'stock_bajo') {
+        listaMostrar = listaMostrar.filter(p => {
+            const minStockVal = parseFloat(localStorage.getItem(`min_stock_prod_${p.id}`) || '3');
+            return p.stock <= minStockVal;
+        });
+    } else if (filtroTemporada === 'linea') {
+        listaMostrar = listaMostrar.filter(p => p.es_temporada !== 1 && p.activa !== 0 && p.categoria_activa !== 0 && p.categoria_padre_activa !== 0);
+    } else if (filtroTemporada === 'temporada') {
+        listaMostrar = listaMostrar.filter(p => p.es_temporada === 1 && p.activa !== 0 && p.categoria_activa !== 0 && p.categoria_padre_activa !== 0);
+    } else if (filtroTemporada === 'pausados') {
+        listaMostrar = listaMostrar.filter(p => (p.activa === 0) || (p.categoria_activa === 0) || (p.categoria_padre_activa === 0));
+    } else {
+        listaMostrar = listaMostrar.filter(p => (p.activa !== 0) && (p.categoria_activa !== 0) && (p.categoria_padre_activa !== 0));
+    }
+
+    renderizarTablaProductos(listaMostrar);
+    renderizarArbolCategorias('prod');
+}
+
+function renderizarTablaProductos(listaMostrar) {
+    const tabla = document.getElementById('tabla-productos');
+    if (!tabla) return;
+
+    poblarSelectorProductosFicha();
+
+    if (!listaMostrar || listaMostrar.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay productos que coincidan con la búsqueda.</td></tr>';
+        return;
+    }
+
+    const filas = listaMostrar.map(p => {
+        const catNombre = p.categoria_padre ? `${p.categoria_padre} ➔ ${p.categoria}` : (p.categoria || 'Sin categoría');
+        
+        let fases = [];
+        try {
+            fases = typeof p.fases_json === 'string' ? JSON.parse(p.fases_json) : (p.fases_json || []);
+        } catch(e) {
+            fases = [];
+        }
+
+        let tipoReceta = '';
+        if (p.tipo_producto === 'postre' || (Array.isArray(fases) && fases.length > 0)) {
+            const resumenFases = fases.map(f => `${f.nombre} (${f.color || 'Sin color'})`).join(' + ');
+            tipoReceta = `
+                <div>
+                    <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-bold inline-flex items-center gap-1">
+                        🧁 Postre (${fases.length} fases)
+                    </span>
+                    <div class="text-[11px] text-gray-500 mt-0.5 max-w-[200px] truncate" title="${resumenFases}">
+                        ${resumenFases || 'Fases configuradas'}
+                    </div>
+                </div>
+            `;
+        } else if (p.usa_receta_propia === 1) {
+            tipoReceta = '<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold">Fórmula Especial</span>';
+        } else {
+            tipoReceta = '<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs font-medium">Usa fórmula general</span>';
+        }
+
+        const minStockKey = `min_stock_prod_${p.id}`;
+        const minStockVal = parseFloat(localStorage.getItem(minStockKey) || '3');
+        const esStockBajo = p.stock <= minStockVal;
+
+        const stockBadge = esStockBajo
+            ? `<span id="stock-badge-prod-${p.id}" class="bg-red-100 text-red-700 border-2 border-red-300 px-3 py-1 rounded-xl text-sm sm:text-base font-black flex items-center gap-1 inline-flex shadow-xs" title="¡Inventario bajo!">⚠️ ${p.stock} pzas</span>`
+            : `<span id="stock-badge-prod-${p.id}" class="text-base sm:text-lg font-black text-rose-950">${p.stock} pzas</span>`;
+
+        let colTemporada = '';
+        const estaPausado = (p.activa === 0) || (p.categoria_activa === 0) || (p.categoria_padre_activa === 0);
+
+        if (p.es_temporada === 1) {
+            if (estaPausado) {
+                colTemporada = `
+                    <button type="button" onclick="alternarTemporadaProducto(${p.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200 transition shadow-2xs cursor-pointer" title="Producto de temporada pausado. Clic para reactivar.">
+                        ❄️ Pausado
+                    </button>
+                `;
+            } else {
+                colTemporada = `
+                    <button type="button" onclick="alternarTemporadaProducto(${p.id})" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition shadow-2xs cursor-pointer" title="Producto de temporada activo. Clic para pausar.">
+                        🍁 Temporada
+                    </button>
+                `;
+            }
+        } else {
+            colTemporada = '<span class="text-xs font-semibold text-slate-400 select-none">De línea</span>';
+        }
+
+        return `
+            <tr class="hover:bg-rose-50/40 transition border-b border-rose-100 ${esStockBajo ? 'bg-red-50/50' : ''}">
+                <td class="p-3.5 font-black text-rose-950 text-sm sm:text-base">${p.nombre}</td>
+                <td class="p-3.5 text-rose-800 text-xs sm:text-sm font-semibold">${catNombre}</td>
+                <td class="p-3.5">${tipoReceta}</td>
+                <td class="p-3.5">
+                    <div class="flex items-center gap-2">
+                        ${stockBadge}
+                        <button onclick="cambiarMinimoStockProd(${p.id}, ${minStockVal})" class="text-[11px] text-rose-400 hover:text-rose-600 font-bold underline" title="Ajustar mínimo">Mín: ${minStockVal}</button>
+                    </div>
+                </td>
+                <td class="p-3.5 text-center whitespace-nowrap">
+                    ${colTemporada}
+                </td>
+                <td class="p-3.5 text-center">
+                    <div class="inline-flex items-center gap-1.5 bg-rose-50/60 p-1 rounded-2xl border border-rose-200">
+                        <input type="number" step="1" id="sumar-stock-prod-${p.id}" placeholder="Cant." class="w-20 border-2 border-rose-200 p-1.5 rounded-xl text-xs sm:text-sm text-center font-black text-rose-950 bg-white focus:outline-none focus:border-rose-400">
+                        <button onclick="ajustarStockProducto(${p.id}, 1, this)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Agregar stock">+ Entrada</button>
+                        <button onclick="ajustarStockProducto(${p.id}, -1, this)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs transition active:scale-95" title="Restar stock">- Restar</button>
+                    </div>
+                </td>
+                <td class="p-3.5 text-center whitespace-nowrap">
+                    <button onclick="duplicarProducto(${p.id})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1.5 rounded-xl text-xs font-black mr-1 transition shadow-xs active:scale-95" title="Clonar esta vela con 1 clic para crear una variante en segundos con otro aroma o color">📋 Duplicar</button>
+                    <button onclick="prepararEditarProducto(${p.id})" class="bg-rose-100 text-rose-800 hover:bg-rose-200 px-3 py-1.5 rounded-xl text-xs font-black mr-1 transition border border-rose-300">✏️ Editar</button>
+                    <button onclick="eliminarProducto(${p.id}, '${p.nombre}')" class="bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-xl text-xs font-black transition border border-red-200">✕</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tabla.innerHTML = filas.join('');
 }
 
 function obtenerOpcionesInsumosCascada(insumoSeleccionadoId = null) {
@@ -1355,7 +1376,7 @@ function obtenerOpcionesInsumosCascada(insumoSeleccionadoId = null) {
 }
 
 let stockUpdatingInsumo = {};
-async function ajustarStockInsumo(id, signo = 1, btnElem = null) {
+function ajustarStockInsumo(id, signo = 1, btnElem = null) {
     if (stockUpdatingInsumo[id]) return;
     const input = document.getElementById(`sumar-stock-insumo-${id}`);
     if (!input) return;
@@ -1370,40 +1391,58 @@ async function ajustarStockInsumo(id, signo = 1, btnElem = null) {
         btnElem.classList.add('opacity-40');
     }
 
+    // 1. Actualización optimista inmediata en memoria (0 ms)
     const item = (insumosLista || []).find(i => i.id == id);
+    const stockAnterior = item ? item.stock : 0;
     if (item) {
         item.stock = Math.max(0, parseFloat(((item.stock || 0) + cantidad).toFixed(3)));
-        filtrarInsumosInstantaneo();
+        const badge = document.getElementById(`stock-badge-insumo-${id}`);
+        if (badge) {
+            const minStockKey = `min_stock_insumo_${id}`;
+            const minStockVal = parseFloat(localStorage.getItem(minStockKey) || '5');
+            const esStockBajo = item.stock <= minStockVal;
+            if (esStockBajo) {
+                badge.className = "bg-red-100 text-red-700 border-2 border-red-300 px-3 py-1 rounded-xl text-sm sm:text-base font-black flex items-center gap-1 inline-flex shadow-xs";
+                badge.innerText = `⚠️ ${item.stock}`;
+            } else {
+                badge.className = "text-base sm:text-lg font-black text-rose-950";
+                badge.innerText = `${item.stock}`;
+            }
+        }
     }
     input.value = '';
 
-    try {
-        const res = await fetch(`/api/insumos/${id}/stock`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cantidad })
-        });
-        if (!res.ok) {
-            await cargarInsumos(true);
-        } else {
-            if (historialInsumosAbierto) {
-                cargarHistorialInsumos();
-            }
+    // 2. Sincronización silenciosa en background sin trabar la interfaz
+    fetch(`/api/insumos/${id}/stock`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cantidad })
+    })
+    .then(async res => {
+        if (!res.ok) throw new Error("Fallo en servidor");
+        if (typeof historialInsumosAbierto !== 'undefined' && historialInsumosAbierto) {
+            cargarHistorialInsumos();
         }
-    } catch(e) {
-        console.error("Error al actualizar stock de insumo:", e);
-        await cargarInsumos(true);
-    } finally {
+    })
+    .catch(err => {
+        console.error("Error al actualizar stock de insumo:", err);
+        alert("No se pudo guardar el cambio de stock en la nube. Se revertirá el valor.");
+        if (item) {
+            item.stock = stockAnterior;
+            filtrarInsumosInstantaneo();
+        }
+    })
+    .finally(() => {
         stockUpdatingInsumo[id] = false;
         if (btnElem) {
             btnElem.disabled = false;
             btnElem.classList.remove('opacity-40');
         }
-    }
+    });
 }
 
 let stockUpdatingProd = {};
-async function ajustarStockProducto(id, signo = 1, btnElem = null) {
+function ajustarStockProducto(id, signo = 1, btnElem = null) {
     if (stockUpdatingProd[id]) return;
     const input = document.getElementById(`sumar-stock-prod-${id}`);
     if (!input) return;
@@ -1418,36 +1457,54 @@ async function ajustarStockProducto(id, signo = 1, btnElem = null) {
         btnElem.classList.add('opacity-40');
     }
 
+    // 1. Actualización optimista inmediata en memoria (0 ms)
     const item = (productosLista || []).find(p => p.id == id);
+    const stockAnterior = item ? item.stock : 0;
     if (item) {
         item.stock = Math.max(0, Math.round((item.stock || 0) + cantidad));
-        filtrarProductosInstantaneo();
+        const badge = document.getElementById(`stock-badge-prod-${id}`);
+        if (badge) {
+            const minStockKey = `min_stock_prod_${id}`;
+            const minStockVal = parseFloat(localStorage.getItem(minStockKey) || '3');
+            const esStockBajo = item.stock <= minStockVal;
+            if (esStockBajo) {
+                badge.className = "bg-red-100 text-red-700 border-2 border-red-300 px-3 py-1 rounded-xl text-sm sm:text-base font-black flex items-center gap-1 inline-flex shadow-xs";
+                badge.innerText = `⚠️ ${item.stock} pzas`;
+            } else {
+                badge.className = "text-base sm:text-lg font-black text-rose-950";
+                badge.innerText = `${item.stock} pzas`;
+            }
+        }
     }
     input.value = '';
 
-    try {
-        const res = await fetch(`/api/productos-terminados/${id}/stock`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cantidad })
-        });
-        if (!res.ok) {
-            await cargarProductos(true);
-        } else {
-            if (historialProductosAbierto) {
-                cargarHistorialProductos();
-            }
+    // 2. Sincronización silenciosa en background sin trabar la interfaz
+    fetch(`/api/productos-terminados/${id}/stock`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cantidad })
+    })
+    .then(async res => {
+        if (!res.ok) throw new Error("Fallo en servidor");
+        if (typeof historialProductosAbierto !== 'undefined' && historialProductosAbierto) {
+            cargarHistorialProductos();
         }
-    } catch(e) {
-        console.error("Error al actualizar stock de producto:", e);
-        await cargarProductos(true);
-    } finally {
+    })
+    .catch(err => {
+        console.error("Error al actualizar stock de producto:", err);
+        alert("No se pudo guardar el cambio de stock en la nube. Se revertirá el valor.");
+        if (item) {
+            item.stock = stockAnterior;
+            filtrarProductosInstantaneo();
+        }
+    })
+    .finally(() => {
         stockUpdatingProd[id] = false;
         if (btnElem) {
             btnElem.disabled = false;
             btnElem.classList.remove('opacity-40');
         }
-    }
+    });
 }
 
 async function actualizarMapeoGenericosProducto(idProdEditar = null, mapeosPrevios = []) {
@@ -2194,7 +2251,7 @@ async function guardarProductoTerminado() {
             alert(editId ? '¡Producto actualizado exitosamente!' : '¡Producto guardado exitosamente!');
             limpiarFormularioProducto();
             await cargarRecetasYMapeos();
-            await cargarProductos();
+            await cargarProductos(true);
         } else {
             const errData = await res.json();
             alert('Error al guardar: ' + (errData.error || 'Ocurrió un error inesperado'));
@@ -2320,8 +2377,8 @@ async function guardarModalCategoria() {
     if (res.ok) {
         cerrarModalCategoria();
         await cargarCategorias();
-        if (tipo === 'insumo') await cargarInsumos();
-        else await cargarProductos();
+        if (tipo === 'insumo') await cargarInsumos(true);
+        else await cargarProductos(true);
     } else {
         const err = await res.json();
         alert('Error al guardar categoría: ' + (err.error || 'Error desconocido'));
@@ -2353,8 +2410,8 @@ async function eliminarCategoriaSegura(tipo, id) {
 
     if (res.ok) {
         await cargarCategorias();
-        if (tipo === 'insumo') await cargarInsumos();
-        else await cargarProductos();
+        if (tipo === 'insumo') await cargarInsumos(true);
+        else await cargarProductos(true);
     } else {
         alert('Error al eliminar categoría.');
     }
@@ -2646,8 +2703,8 @@ async function procesarProduccionMúltiple() {
         document.getElementById('contenedor-lote-productos').innerHTML = '';
         document.getElementById('contenedor-insumos-extra').innerHTML = '';
         agregarFilaProductoLote();
-        await cargarInsumos();
-        await cargarProductos();
+        await cargarInsumos(true);
+        await cargarProductos(true);
         await cargarHistoriales();
     } else {
         alert("Error en la producción:\n\n" + data.error);
@@ -3822,7 +3879,7 @@ async function alternarTemporadaCategoria(catId) {
         const res = await fetch(`/api/categorias-productos/${catId}/toggle-activa`, { method: 'PATCH' });
         if (res.ok) {
             await cargarCategorias();
-            await cargarProductos();
+            await cargarProductos(true);
         }
     } catch(e) {
         console.error("Error al alternar temporada de categoría:", e);
@@ -3833,7 +3890,7 @@ async function alternarTemporadaProducto(prodId) {
     try {
         const res = await fetch(`/api/productos-terminados/${prodId}/toggle-activa`, { method: 'PATCH' });
         if (res.ok) {
-            await cargarProductos();
+            await cargarProductos(true);
         }
     } catch(e) {
         console.error("Error al alternar temporada de producto:", e);
@@ -4483,7 +4540,7 @@ async function alternarTemporadaInsumo(insumoId) {
     try {
         const res = await fetch(`/api/insumos/${insumoId}/toggle-activa`, { method: 'PATCH' });
         if (res.ok) {
-            await cargarInsumos();
+            await cargarInsumos(true);
         }
     } catch(e) {
         console.error("Error al alternar temporada de insumo:", e);
